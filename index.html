@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vision — City Performance Tracker</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>Vision — City Performance</h1>
+    <div class="asof" id="asOfLabel">Loading…</div>
+  </div>
+  <div class="controls">
+    <div class="toggle-group" id="serviceToggle">
+      <button data-val="Non-QC Inhouse" class="active">Non-QC</button>
+      <button data-val="QC">QC</button>
+    </div>
+    <div class="toggle-group" id="periodToggle">
+      <button data-val="DoD" class="active">DoD</button>
+      <button data-val="WoW">WoW</button>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="section-label">Needs attention</div>
+  <div id="breachGrid" class="card-grid"><div class="loading">Loading…</div></div>
+
+  <div class="section-label">As per trend</div>
+  <div id="trendStrip" class="trend-strip"></div>
+</div>
+
+<script src="config.js"></script>
+<script>
+const state = { service: 'Non-QC Inhouse', period: 'DoD' };
+
+document.getElementById('serviceToggle').addEventListener('click', (e) => {
+  if (e.target.tagName !== 'BUTTON') return;
+  setActive(e.currentTarget, e.target);
+  state.service = e.target.dataset.val;
+  load();
+});
+document.getElementById('periodToggle').addEventListener('click', (e) => {
+  if (e.target.tagName !== 'BUTTON') return;
+  setActive(e.currentTarget, e.target);
+  state.period = e.target.dataset.val;
+  load();
+});
+function setActive(group, btn) {
+  [...group.children].forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function fmtPct(v) { return (v * 100).toFixed(1) + '%'; }
+
+function metricLabel(m) {
+  return m === 'Overall Breach' ? 'Overall Breach' : 'Long Tail (LM Induced)';
+}
+
+function renderBreachCard(c) {
+  const sevClass = c.breaches[0].severity; // dominant severity for the left border
+  const rows = c.breaches.map(b => {
+    const arrow = b.trend === 'worsening' ? '▲' : (b.trend === 'improving' ? '▼' : '—');
+    return `
+      <div class="metric-row">
+        <span class="metric-name">${metricLabel(b.metric)}</span>
+        <span class="metric-vals">
+          <span>${fmtPct(b.actual)} <span style="color:var(--text-muted)">vs ${fmtPct(b.baseline)}</span></span>
+          <span class="pill ${b.severity}">+${(b.deviationPct*100).toFixed(0)}%</span>
+          <span class="trend-arrow ${b.trend}" title="${b.trend}, ${Math.abs(b.trendDeltaPts).toFixed(1)}pt vs prior period">${arrow}</span>
+        </span>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="city-card ${sevClass}" onclick="goToCity('${c.city}','${c.service}')">
+      <div class="city-name">${c.city}</div>
+      <div class="driven-by">Driven by: ${metricLabel(c.drivenBy)}</div>
+      ${rows}
+    </div>`;
+}
+
+function goToCity(city, service) {
+  window.location.href = `city.html?city=${encodeURIComponent(city)}&service=${encodeURIComponent(service)}`;
+}
+
+async function load() {
+  document.getElementById('breachGrid').innerHTML = '<div class="loading">Loading…</div>';
+  document.getElementById('trendStrip').innerHTML = '';
+  try {
+    const url = `${WEBAPP_URL}?action=home&service=${encodeURIComponent(state.service)}&period=${state.period}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('asOfLabel').textContent =
+      data.period === 'DoD' ? `As of ${data.asOf}` : `Week ending ${data.asOf}`;
+
+    const grid = document.getElementById('breachGrid');
+    if (!data.cities.length) {
+      grid.innerHTML = '<div class="empty-state">No breached cities in this view.</div>';
+    } else {
+      grid.innerHTML = data.cities.map(renderBreachCard).join('');
+    }
+
+    const strip = document.getElementById('trendStrip');
+    if (!data.asPerTrend.length) {
+      strip.innerHTML = '<div class="empty-state">—</div>';
+    } else {
+      strip.innerHTML = data.asPerTrend.map(c =>
+        `<div class="trend-chip" onclick="goToCity('${c.city}','${c.service}')">${c.city}</div>`
+      ).join('');
+    }
+  } catch (err) {
+    document.getElementById('breachGrid').innerHTML =
+      `<div class="empty-state">Couldn't load data: ${err.message}. Check WEBAPP_URL in config.js and that the Apps Script is deployed.</div>`;
+  }
+}
+
+load();
+</script>
+</body>
+</html>
