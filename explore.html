@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vision — Explore All Cities</title>
+<link rel="stylesheet" href="style.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <a class="back-link" href="index.html">← Back to Vision home</a>
+    <h1>Explore — All Cities</h1>
+  </div>
+  <div class="controls">
+    <select id="serviceSelect" style="padding:6px 10px;border-radius:6px;border:none;font-size:13px;font-weight:600;">
+      <option value="Non-QC Inhouse">Non-QC</option>
+      <option value="QC">QC</option>
+    </select>
+    <select id="citySelect" style="padding:6px 10px;border-radius:6px;border:none;font-size:13px;font-weight:600;min-width:160px;">
+      <option>Loading cities…</option>
+    </select>
+    <div class="toggle-group" id="periodToggle">
+      <button data-val="DoD" class="active">DoD</button>
+      <button data-val="WoW">WoW</button>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div id="chartGrid" class="chart-grid"><div class="loading">Pick a city above to see its metrics.</div></div>
+</div>
+
+<script src="config.js"></script>
+<script src="citycharts.js"></script>
+<script>
+let period = 'DoD';
+let cityMeta = {}, rawSeries = null;
+let citiesByService = {};
+
+const serviceSelect = document.getElementById('serviceSelect');
+const citySelect = document.getElementById('citySelect');
+
+document.getElementById('periodToggle').addEventListener('click', (e) => {
+  if (e.target.tagName !== 'BUTTON') return;
+  [...e.currentTarget.children].forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  period = e.target.dataset.val;
+  if (rawSeries) renderCityCharts(cityMeta, rawSeries, period);
+});
+
+serviceSelect.addEventListener('change', () => {
+  populateCityDropdown(serviceSelect.value);
+  loadSelectedCity();
+});
+citySelect.addEventListener('change', loadSelectedCity);
+
+function populateCityDropdown(service) {
+  const cities = citiesByService[service] || [];
+  citySelect.innerHTML = cities.length
+    ? cities.map(c => `<option value="${c}">${c}</option>`).join('')
+    : '<option>No cities found</option>';
+}
+
+async function loadSelectedCity() {
+  const city = citySelect.value;
+  const service = serviceSelect.value;
+  if (!city || city === 'No cities found') {
+    document.getElementById('chartGrid').innerHTML = '<div class="empty-state">No data available for this service yet.</div>';
+    return;
+  }
+  document.getElementById('chartGrid').innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const data = await fetchCityData(city, service);
+    cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
+    rawSeries = data.series;
+    document.getElementById('chartGrid').innerHTML = chartCardsHTML(cityMeta);
+    renderCityCharts(cityMeta, rawSeries, period);
+  } catch (err) {
+    document.getElementById('chartGrid').innerHTML = `<div class="empty-state">Couldn't load data: ${err.message}</div>`;
+  }
+}
+
+async function init() {
+  try {
+    const res = await fetch(`${WEBAPP_URL}?action=meta`);
+    const meta = await res.json();
+    if (meta.error) throw new Error(meta.error);
+    citiesByService = meta.citiesByService || {};
+    populateCityDropdown(serviceSelect.value);
+    loadSelectedCity();
+  } catch (err) {
+    document.getElementById('chartGrid').innerHTML = `<div class="empty-state">Couldn't load city list: ${err.message}</div>`;
+  }
+}
+init();
+</script>
+</body>
+</html>
