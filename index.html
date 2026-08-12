@@ -8,6 +8,18 @@
 </head>
 <body>
 
+<div id="lockScreen" class="lock-screen">
+  <div class="lock-box">
+    <h2>Vision — City Performance</h2>
+    <p>Enter password to continue</p>
+    <input type="password" id="lockInput" placeholder="Password" autocomplete="off" />
+    <button id="lockSubmit" class="nav-btn" style="background:var(--header-blue);border:none;width:100%;padding:10px;">Unlock</button>
+    <div id="lockError" class="lock-error"></div>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none;">
+
 <div class="topbar">
   <div>
     <h1>Vision — City Performance</h1>
@@ -35,8 +47,43 @@
   <div id="trendStrip" class="trend-strip"></div>
 </div>
 
+</div><!-- /appRoot -->
+
 <script src="config.js"></script>
 <script>
+const LOCK_KEY = 'vision_unlocked';
+
+function initLock() {
+  const lockScreen = document.getElementById('lockScreen');
+  const appRoot = document.getElementById('appRoot');
+  const input = document.getElementById('lockInput');
+  const errorEl = document.getElementById('lockError');
+
+  if (sessionStorage.getItem(LOCK_KEY) === '1') {
+    lockScreen.style.display = 'none';
+    appRoot.style.display = 'block';
+    load();
+    return;
+  }
+
+  function tryUnlock() {
+    if (input.value === DASHBOARD_PASSWORD) {
+      sessionStorage.setItem(LOCK_KEY, '1');
+      lockScreen.style.display = 'none';
+      appRoot.style.display = 'block';
+      load();
+    } else {
+      errorEl.textContent = 'Incorrect password';
+      input.value = '';
+      input.focus();
+    }
+  }
+
+  document.getElementById('lockSubmit').addEventListener('click', tryUnlock);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+  input.focus();
+}
+
 const state = { service: 'Non-QC Inhouse', period: 'DoD' };
 
 document.getElementById('serviceToggle').addEventListener('click', (e) => {
@@ -135,7 +182,7 @@ async function load() {
   }
 }
 
-load();
+initLock();
 </script>
 </body>
 </html>
