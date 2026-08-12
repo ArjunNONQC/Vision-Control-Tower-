@@ -1,0 +1,242 @@
+:root {
+  --header-blue: #1F4E79;
+  --subheader-blue: #2E5C8A;
+  --bg: #F4F6F8;
+  --card-bg: #FFFFFF;
+  --border: #DDE3E9;
+  --text: #1C2B36;
+  --text-muted: #6B7A85;
+  --red: #C0392B;
+  --red-bg: #FDECEA;
+  --amber: #B8860B;
+  --amber-bg: #FFF6E0;
+  --green: #1E8449;
+  --green-bg: #EAF7EE;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.topbar {
+  background: var(--header-blue);
+  color: #fff;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.topbar h1 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.2px;
+}
+
+.topbar .asof {
+  font-size: 12px;
+  color: #CFE0EE;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.toggle-group {
+  display: inline-flex;
+  background: rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.toggle-group button {
+  border: none;
+  background: transparent;
+  color: #E8F0F8;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.toggle-group button.active {
+  background: #fff;
+  color: var(--header-blue);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.section-label {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  margin: 28px 0 12px;
+}
+
+.section-label:first-child { margin-top: 0; }
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.city-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--amber);
+  border-radius: 8px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.city-card:hover {
+  box-shadow: 0 4px 14px rgba(31, 78, 121, 0.12);
+  transform: translateY(-1px);
+}
+
+.city-card.red { border-left-color: var(--red); }
+.city-card.amber { border-left-color: var(--amber); }
+
+.city-card .city-name {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.city-card .driven-by {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid #F0F2F4;
+  font-size: 13px;
+}
+
+.metric-row:first-of-type { border-top: none; }
+
+.metric-name { color: var(--text); font-weight: 600; }
+
+.metric-vals {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+.pill.red { background: var(--red-bg); color: var(--red); }
+.pill.amber { background: var(--amber-bg); color: var(--amber); }
+
+.trend-arrow { font-size: 12px; }
+.trend-arrow.worsening { color: var(--red); }
+.trend-arrow.improving { color: var(--green); }
+.trend-arrow.flat { color: var(--text-muted); }
+
+.trend-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trend-chip {
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid #CDEBD8;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trend-chip:hover { filter: brightness(0.97); }
+
+.empty-state {
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 20px 0;
+}
+
+.loading { color: var(--text-muted); padding: 40px 0; text-align: center; }
+
+/* City detail page */
+.back-link {
+  color: #CFE0EE;
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.back-link:hover { text-decoration: underline; }
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.chart-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.chart-card h3 {
+  font-size: 14px;
+  margin: 0 0 4px;
+  color: var(--subheader-blue);
+}
+
+.chart-card .sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.baseline-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+
+.baseline-swatch {
+  width: 14px;
+  height: 0;
+  border-top: 2px dashed var(--red);
+  display: inline-block;
+}
