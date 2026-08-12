@@ -96,12 +96,16 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
   if (extraLineDatasets) datasets.push(...extraLineDatasets);
 
   charts[canvasId] = new Chart(ctx, {
+    type: 'bar',
     data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 11, weight: '600' }, usePointStyle: true } },
+        legend: {
+          display: true, position: 'top', reverse: false,
+          labels: { boxWidth: 12, font: { size: 11, weight: '600' }, usePointStyle: true },
+        },
         tooltip: { callbacks: tooltipExtra ? { afterBody: tooltipExtra } : undefined },
       },
       scales: {
