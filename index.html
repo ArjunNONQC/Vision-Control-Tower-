@@ -14,6 +14,7 @@
     <div class="asof" id="asOfLabel">Loading…</div>
   </div>
   <div class="controls">
+    <a class="back-link" href="explore.html" style="margin-right:8px;">All cities →</a>
     <div class="toggle-group" id="serviceToggle">
       <button data-val="Non-QC Inhouse" class="active">Non-QC</button>
       <button data-val="QC">QC</button>
@@ -26,6 +27,7 @@
 </div>
 
 <div class="container">
+  <div id="diagBanner"></div>
   <div class="section-label">Needs attention</div>
   <div id="breachGrid" class="card-grid"><div class="loading">Loading…</div></div>
 
@@ -95,6 +97,19 @@ async function load() {
     const res = await fetch(url);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
+
+    const diagBanner = document.getElementById('diagBanner');
+    if (data.diagnostic) {
+      // asOf came back null — no rows matched this service at all
+      document.getElementById('asOfLabel').textContent = 'No data found';
+      diagBanner.innerHTML = `<div class="empty-state" style="background:#FDECEA;border:1px solid #F5C6C0;border-radius:8px;padding:12px 16px;margin-bottom:16px;color:#8B2E22;">
+        <strong>No rows matched.</strong> ${data.diagnostic.message}
+      </div>`;
+      document.getElementById('breachGrid').innerHTML = '';
+      document.getElementById('trendStrip').innerHTML = '';
+      return;
+    }
+    diagBanner.innerHTML = '';
 
     document.getElementById('asOfLabel').textContent =
       data.period === 'DoD' ? `As of ${data.asOf}` : `Week ending ${data.asOf}`;
