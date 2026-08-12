@@ -1,6 +1,20 @@
 // Shared between city.html and explore.html
 const charts = {};
 
+const COLOR = {
+  bar: 'rgba(125, 199, 240, 0.75)',
+  barBorder: '#4FB3E8',
+  line: '#16324F',
+  baseline: '#E74C3C',
+  cancel: '#E74C3C',
+  nps: '#1E8449',
+  retryLine: '#D68910',
+};
+
+if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
+  Chart.register(ChartDataLabels);
+}
+
 function toWeekly(series, fields) {
   const weeks = {};
   series.forEach(row => {
@@ -30,38 +44,109 @@ function toWeekly(series, fields) {
     });
     out.orders = totalOrders;
     out.breachOrders = rows.reduce((s, r) => s + (r.breachOrders || 0), 0);
+    out.ofdOrders = rows.reduce((s, r) => s + (r.ofdOrders || 0), 0);
+    out.retries = rows.reduce((s, r) => s + (r.retries || 0), 0);
     return out;
   });
 }
 
-function baselineDataset(value, len, label) {
+function baselineLineDataset(value, len) {
   if (value == null) return null;
   return {
-    label, data: Array(len).fill(value * 100),
-    borderColor: '#C0392B', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5, fill: false,
+    type: 'line', label: 'Baseline', yAxisID: 'yPct',
+    data: Array(len).fill(round1_(value * 100)),
+    borderColor: COLOR.baseline, borderDash: [6, 4], pointRadius: 0, borderWidth: 2, fill: false,
+    datalabels: { display: false },
   };
 }
 
-function makeLineChart(canvasId, labels, datasets, yLabel, absoluteTooltipFn) {
+function round1_(n) { return Math.round(n * 10) / 10; }
+
+// Combo chart: light-blue bars = order volume (left axis), navy line = headline % metric (right axis)
+function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLineDatasets, tooltipExtra) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
+  const showLabels = labels.length <= 10;
+  const ctx = canvas.getContext('2d');
+
+  const datasets = [
+    {
+      type: 'bar', label: 'Orders', yAxisID: 'yOrders',
+      data: orders, backgroundColor: COLOR.bar, borderColor: COLOR.barBorder, borderWidth: 1,
+      borderRadius: 4, order: 2,
+      datalabels: {
+        display: showLabels, anchor: 'end', align: 'top', color: '#3E7CA6',
+        font: { size: 10, weight: '600' },
+        formatter: v => v >= 1000 ? (v / 1000).toFixed(1) + 'K' : v,
+      },
+    },
+    {
+      type: 'line', label: pctLabel, yAxisID: 'yPct',
+      data: pctValues, borderColor: COLOR.line, backgroundColor: 'rgba(22,50,79,0.08)',
+      borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.line,
+      pointBorderWidth: 2, tension: 0.3, fill: false, order: 1,
+      datalabels: {
+        display: showLabels, align: 'top', offset: 8, color: COLOR.line,
+        font: { size: 11, weight: '700' },
+        formatter: v => v.toFixed(1) + '%',
+      },
+    },
+  ];
+  if (extraLineDatasets) datasets.push(...extraLineDatasets);
+
+  charts[canvasId] = new Chart(ctx, {
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 11, weight: '600' }, usePointStyle: true } },
+        tooltip: { callbacks: tooltipExtra ? { afterBody: tooltipExtra } : undefined },
+      },
+      scales: {
+        yOrders: {
+          position: 'left', beginAtZero: true,
+          title: { display: true, text: 'Orders', font: { size: 11 } },
+          ticks: { font: { size: 10 } }, grid: { display: false },
+        },
+        yPct: {
+          position: 'right', beginAtZero: true,
+          title: { display: true, text: '%', font: { size: 11 } },
+          ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#F0F4F8' },
+        },
+        x: { ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45 }, grid: { display: false } },
+      },
+    },
+  });
+}
+
+function makeLineOnlyChart(canvasId, labels, datasets, yLabel) {
+  if (charts[canvasId]) charts[canvasId].destroy();
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const showLabels = labels.length <= 10;
+  datasets.forEach(ds => {
+    ds.datalabels = ds.datalabels || {
+      display: showLabels, align: 'top', offset: 6, color: ds.borderColor,
+      font: { size: 10, weight: '700' },
+    };
+  });
   const ctx = canvas.getContext('2d');
   charts[canvasId] = new Chart(ctx, {
     type: 'line',
     data: { labels, datasets },
     options: {
-      responsive: true,
+      responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { display: datasets.length > 1, labels: { boxWidth: 12, font: { size: 11 } } },
-        tooltip: absoluteTooltipFn ? { callbacks: { afterBody: absoluteTooltipFn } } : {}
+        legend: { display: datasets.length > 1, position: 'top', labels: { boxWidth: 12, font: { size: 11, weight: '600' }, usePointStyle: true } },
       },
       scales: {
-        y: { title: { display: true, text: yLabel, font: { size: 11 } }, ticks: { font: { size: 10 } } },
-        x: { ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45 } }
-      }
-    }
+        y: { title: { display: true, text: yLabel, font: { size: 11 } }, ticks: { font: { size: 10 } }, grid: { color: '#F0F4F8' } },
+        x: { ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45 }, grid: { display: false } },
+      },
+    },
   });
 }
 
@@ -69,33 +154,33 @@ function chartCardsHTML(cityMeta) {
   return `
     <div class="chart-card">
       <h3>Breach % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : '<span class="baseline-legend">No baseline set</span>'}</h3>
-      <div class="sub">Hover a point to see absolute order counts</div>
-      <canvas id="chartBreach"></canvas>
+      <div class="sub">Bars = order volume · Line = breach %</div>
+      <div class="chart-canvas-wrap"><canvas id="chartBreach"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>Long Tail % (LM Induced) ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3>
-      <div class="sub">Hover a point to see order volume</div>
-      <canvas id="chartLT"></canvas>
+      <div class="sub">Bars = order volume · Line = long tail %</div>
+      <div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>Cancellation %</h3>
-      <div class="sub">No baseline set yet</div>
-      <canvas id="chartCancel"></canvas>
+      <div class="sub">Bars = order volume · Line = cancellation % · No baseline set yet</div>
+      <div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>NPS (Rolling 7 Days)</h3>
       <div class="sub">No baseline set yet</div>
-      <canvas id="chartNps"></canvas>
+      <div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>TAT Breakdown (90th %ile)</h3>
       <div class="sub">Overall / SQ→MDQ / MDQ→Del / ETA — no baselines set yet</div>
-      <canvas id="chartTat"></canvas>
+      <div class="chart-canvas-wrap"><canvas id="chartTat"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>Retry Rate</h3>
-      <div class="sub">Hover a point to see absolute retry counts</div>
-      <canvas id="chartRetry"></canvas>
+      <div class="sub">Bars = OFD orders · Line = retry %</div>
+      <div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div>
     </div>`;
 }
 
@@ -103,52 +188,40 @@ function renderCityCharts(cityMeta, rawSeries, period) {
   const fields = ['breachPct','ltPct','cancellationPct','nps','overallTat','sqToMdq','mdqToDel','eta','retryRate'];
   const series = period === 'WoW' ? toWeekly(rawSeries, fields) : rawSeries;
   const labels = series.map(r => r.date);
+  const orders = series.map(r => r.orders);
 
-  const breachDatasets = [{
-    label: 'Breach %', data: series.map(r => r.breachPct * 100),
-    borderColor: '#1F4E79', backgroundColor: 'rgba(31,78,121,0.08)', fill: true, tension: 0.25
-  }];
-  const bBaseline = baselineDataset(cityMeta.overallBreachBaseline, series.length, 'Baseline');
-  if (bBaseline) breachDatasets.push(bBaseline);
-  makeLineChart('chartBreach', labels, breachDatasets, '%', (items) => {
+  const breachPct = series.map(r => round1_(r.breachPct * 100));
+  const breachExtra = [baselineLineDataset(cityMeta.overallBreachBaseline, series.length)].filter(Boolean);
+  makeComboChart('chartBreach', labels, orders, breachPct, 'Breach %', breachExtra, (items) => {
     const r = series[items[0].dataIndex];
-    return [`Absolute: ${r.breachOrders ?? '—'} of ${r.orders ?? '—'} orders`];
+    return [`Breach orders: ${r.breachOrders ?? '—'} of ${r.orders ?? '—'}`];
   });
 
-  const ltDatasets = [{
-    label: 'Long Tail %', data: series.map(r => r.ltPct * 100),
-    borderColor: '#2E5C8A', backgroundColor: 'rgba(46,92,138,0.08)', fill: true, tension: 0.25
-  }];
-  const ltBaseline = baselineDataset(cityMeta.ltBaseline, series.length, 'Baseline');
-  if (ltBaseline) ltDatasets.push(ltBaseline);
-  makeLineChart('chartLT', labels, ltDatasets, '%', (items) => {
-    const r = series[items[0].dataIndex];
-    return [`Orders that day: ${r.orders ?? '—'}`];
-  });
+  const ltPct = series.map(r => round1_(r.ltPct * 100));
+  const ltExtra = [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean);
+  makeComboChart('chartLT', labels, orders, ltPct, 'Long Tail %', ltExtra);
 
-  makeLineChart('chartCancel', labels, [{
-    label: 'Cancellation %', data: series.map(r => r.cancellationPct * 100),
-    borderColor: '#C0392B', backgroundColor: 'rgba(192,57,43,0.08)', fill: true, tension: 0.25
-  }], '%');
+  const cancelPct = series.map(r => round1_(r.cancellationPct * 100));
+  makeComboChart('chartCancel', labels, orders, cancelPct, 'Cancellation %', null);
 
-  makeLineChart('chartNps', labels, [{
+  makeLineOnlyChart('chartNps', labels, [{
     label: 'NPS (rolling 7d)', data: series.map(r => r.nps),
-    borderColor: '#1E8449', backgroundColor: 'rgba(30,132,73,0.08)', fill: true, tension: 0.25
+    borderColor: COLOR.nps, backgroundColor: 'rgba(30,132,73,0.10)', borderWidth: 3,
+    pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.nps, pointBorderWidth: 2,
+    fill: true, tension: 0.3,
   }], 'Score');
 
-  makeLineChart('chartTat', labels, [
-    { label: 'Overall TAT (90th %ile, min)', data: series.map(r => r.overallTat), borderColor: '#1F4E79', tension: 0.25 },
-    { label: 'SQ→MDQ (min)', data: series.map(r => r.sqToMdq), borderColor: '#8E6C21', tension: 0.25 },
-    { label: 'MDQ→Del (min)', data: series.map(r => r.mdqToDel), borderColor: '#6C3483', tension: 0.25 },
-    { label: 'ETA (90th %ile, min)', data: series.map(r => r.eta), borderColor: '#B03A2E', tension: 0.25 },
+  makeLineOnlyChart('chartTat', labels, [
+    { label: 'Overall TAT (min)', data: series.map(r => r.overallTat), borderColor: '#16324F', borderWidth: 2.5, pointRadius: 3, tension: 0.3, datalabels: { display: false } },
+    { label: 'SQ→MDQ (min)', data: series.map(r => r.sqToMdq), borderColor: '#D68910', borderWidth: 2.5, pointRadius: 3, tension: 0.3, datalabels: { display: false } },
+    { label: 'MDQ→Del (min)', data: series.map(r => r.mdqToDel), borderColor: '#8E44AD', borderWidth: 2.5, pointRadius: 3, tension: 0.3, datalabels: { display: false } },
+    { label: 'ETA (min)', data: series.map(r => r.eta), borderColor: '#E74C3C', borderWidth: 2.5, pointRadius: 3, tension: 0.3, datalabels: { display: false } },
   ], 'Minutes');
 
-  makeLineChart('chartRetry', labels, [{
-    label: 'Retry rate', data: series.map(r => (r.retryRate != null ? r.retryRate * 100 : null)),
-    borderColor: '#B8860B', backgroundColor: 'rgba(184,134,11,0.08)', fill: true, tension: 0.25
-  }], '%', (items) => {
+  const retryPct = series.map(r => (r.retryRate != null ? round1_(r.retryRate * 100) : null));
+  makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), retryPct, 'Retry %', null, (items) => {
     const r = series[items[0].dataIndex];
-    return [`Absolute: ${r.retries ?? '—'} of ${r.ofdOrders ?? '—'} OFD orders`];
+    return [`Retries: ${r.retries ?? '—'} of ${r.ofdOrders ?? '—'} OFD orders`];
   });
 }
 
