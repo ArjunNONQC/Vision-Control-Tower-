@@ -6,20 +6,21 @@
 <title>Vision — Explore All Cities</title>
 <link rel="stylesheet" href="style.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
 <body>
 
 <div class="topbar">
   <div>
-    <a class="back-link" href="index.html">← Back to Vision home</a>
+    <a class="nav-btn" href="index.html">← Vision Home</a>
     <h1>Explore — All Cities</h1>
   </div>
   <div class="controls">
-    <select id="serviceSelect" style="padding:6px 10px;border-radius:6px;border:none;font-size:13px;font-weight:600;">
+    <select id="serviceSelect" class="control-select">
       <option value="Non-QC Inhouse">Non-QC</option>
       <option value="QC">QC</option>
     </select>
-    <select id="citySelect" style="padding:6px 10px;border-radius:6px;border:none;font-size:13px;font-weight:600;min-width:160px;">
+    <select id="citySelect" class="control-select" style="min-width:160px;">
       <option>Loading cities…</option>
     </select>
     <div class="toggle-group" id="periodToggle">
