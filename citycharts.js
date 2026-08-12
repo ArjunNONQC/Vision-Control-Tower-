@@ -177,9 +177,24 @@ function chartCardsHTML(cityMeta) {
       <div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div>
     </div>
     <div class="chart-card">
-      <h3>TAT Breakdown (90th %ile)</h3>
-      <div class="sub">Overall / SQ→MDQ / MDQ→Del / ETA — no baselines set yet</div>
-      <div class="chart-canvas-wrap"><canvas id="chartTat"></canvas></div>
+      <h3>Overall TAT (90th %ile)</h3>
+      <div class="sub">No baseline set yet</div>
+      <div class="chart-canvas-wrap"><canvas id="chartTatOverall"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>SQ→MDQ (90th %ile)</h3>
+      <div class="sub">No baseline set yet</div>
+      <div class="chart-canvas-wrap"><canvas id="chartTatSqMdq"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>MDQ→Del (90th %ile)</h3>
+      <div class="sub">No baseline set yet</div>
+      <div class="chart-canvas-wrap"><canvas id="chartTatMdqDel"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>ETA (90th %ile)</h3>
+      <div class="sub">No baseline set yet</div>
+      <div class="chart-canvas-wrap"><canvas id="chartTatEta"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>Retry Rate</h3>
@@ -215,12 +230,33 @@ function renderCityCharts(cityMeta, rawSeries, period) {
     fill: true, tension: 0.3,
   }], 'Score');
 
-  makeLineOnlyChart('chartTat', labels, [
-    { label: 'Overall TAT (min)', data: series.map(r => r.overallTat), borderColor: '#16324F', borderWidth: 2.5, pointRadius: 3, tension: 0.3, datalabels: { display: false } },
-    { label: 'SQ→MDQ (min)', data: series.map(r => r.sqToMdq), borderColor: '#D68910', borderWidth: 2.5, pointRadius: 3, tension: 0.3, datalabels: { display: false } },
-    { label: 'MDQ→Del (min)', data: series.map(r => r.mdqToDel), borderColor: '#8E44AD', borderWidth: 2.5, pointRadius: 3, tension: 0.3, datalabels: { display: false } },
-    { label: 'ETA (min)', data: series.map(r => r.eta), borderColor: '#E74C3C', borderWidth: 2.5, pointRadius: 3, tension: 0.3, datalabels: { display: false } },
-  ], 'Minutes');
+  makeLineOnlyChart('chartTatOverall', labels, [{
+    label: 'Overall TAT (min)', data: series.map(r => r.overallTat),
+    borderColor: '#16324F', backgroundColor: 'rgba(22,50,79,0.08)', borderWidth: 3,
+    pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: '#16324F', pointBorderWidth: 2,
+    fill: true, tension: 0.3,
+  }], 'Minutes');
+
+  makeLineOnlyChart('chartTatSqMdq', labels, [{
+    label: 'SQ→MDQ (min)', data: series.map(r => r.sqToMdq),
+    borderColor: '#D68910', backgroundColor: 'rgba(214,137,16,0.08)', borderWidth: 3,
+    pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: '#D68910', pointBorderWidth: 2,
+    fill: true, tension: 0.3,
+  }], 'Minutes');
+
+  makeLineOnlyChart('chartTatMdqDel', labels, [{
+    label: 'MDQ→Del (min)', data: series.map(r => r.mdqToDel),
+    borderColor: '#8E44AD', backgroundColor: 'rgba(142,68,173,0.08)', borderWidth: 3,
+    pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: '#8E44AD', pointBorderWidth: 2,
+    fill: true, tension: 0.3,
+  }], 'Minutes');
+
+  makeLineOnlyChart('chartTatEta', labels, [{
+    label: 'ETA (min)', data: series.map(r => r.eta),
+    borderColor: '#E74C3C', backgroundColor: 'rgba(231,76,60,0.08)', borderWidth: 3,
+    pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: '#E74C3C', pointBorderWidth: 2,
+    fill: true, tension: 0.3,
+  }], 'Minutes');
 
   const retryPct = series.map(r => (r.retryRate != null ? round1_(r.retryRate * 100) : null));
   makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), retryPct, 'Retry %', null, (items) => {
