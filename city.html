@@ -16,6 +16,10 @@
     <h1 id="cityTitle">Loading…</h1>
   </div>
   <div class="controls">
+    <div class="toggle-group" id="serviceToggle">
+      <button data-val="Non-QC Inhouse" class="active">Non-QC</button>
+      <button data-val="QC">QC</button>
+    </div>
     <div class="toggle-group" id="periodToggle">
       <button data-val="DoD" class="active">DoD</button>
       <button data-val="WoW">WoW</button>
@@ -24,6 +28,7 @@
 </div>
 
 <div class="container">
+  <div id="scorecardHolder"></div>
   <div id="chartGrid" class="chart-grid"><div class="loading">Loading…</div></div>
 </div>
 
@@ -32,12 +37,22 @@
 <script>
 const params = new URLSearchParams(window.location.search);
 const CITY = params.get('city');
-const SERVICE = params.get('service') || 'Non-QC Inhouse';
+let service = params.get('service') || 'Non-QC Inhouse';
 let period = 'DoD';
 let cityMeta = {}, rawSeries = null;
 
-document.getElementById('cityTitle').textContent = `${CITY} — ${SERVICE}`;
+document.getElementById('cityTitle').textContent = CITY;
+[...document.getElementById('serviceToggle').children].forEach(b => {
+  b.classList.toggle('active', b.dataset.val === service);
+});
 
+document.getElementById('serviceToggle').addEventListener('click', (e) => {
+  if (e.target.tagName !== 'BUTTON') return;
+  [...e.currentTarget.children].forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  service = e.target.dataset.val;
+  load();
+});
 document.getElementById('periodToggle').addEventListener('click', (e) => {
   if (e.target.tagName !== 'BUTTON') return;
   [...e.currentTarget.children].forEach(b => b.classList.remove('active'));
@@ -47,10 +62,13 @@ document.getElementById('periodToggle').addEventListener('click', (e) => {
 });
 
 async function load() {
+  document.getElementById('chartGrid').innerHTML = '<div class="loading">Loading…</div>';
   try {
-    const data = await fetchCityData(CITY, SERVICE);
+    const data = await fetchCityData(CITY, service);
     cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
     rawSeries = data.series;
+    document.getElementById('cityTitle').textContent = `${CITY} — ${service}`;
+    document.getElementById('scorecardHolder').innerHTML = orderSummaryHTML(data.orderSummary);
     document.getElementById('chartGrid').innerHTML = chartCardsHTML(cityMeta);
     renderCityCharts(cityMeta, rawSeries, period);
   } catch (err) {
