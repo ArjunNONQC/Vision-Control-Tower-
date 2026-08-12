@@ -200,7 +200,6 @@ function chartCardsHTML(cityMeta) {
       <h3>Retry Rate</h3>
       <div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div>
     </div>
-    <div class="chart-card" style="visibility:hidden;"></div>
 
     <div class="section-divider">Queue-Level TAT in Hrs (90th %ile)</div>
 
