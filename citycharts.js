@@ -1,18 +1,35 @@
 // Shared between city.html and explore.html
 const charts = {};
 
+// Single consistent theme across every chart, matching the AWS Quick reference:
+// combo charts = light-blue bars + navy line; single-metric charts = one light-blue line.
 const COLOR = {
   bar: 'rgba(125, 199, 240, 0.75)',
   barBorder: '#4FB3E8',
-  line: '#16324F',
+  navyLine: '#16324F',
+  singleLine: '#4FB3E8',   // uniform color for every single-metric chart (NPS, TAT x4)
   baseline: '#E74C3C',
-  cancel: '#E74C3C',
-  nps: '#1E8449',
-  retryLine: '#D68910',
 };
 
 if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
   Chart.register(ChartDataLabels);
+}
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function fmtDayLabel(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
+function fmtWeekLabel(mondayStr) {
+  const mon = new Date(mondayStr + 'T00:00:00');
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  const sameMonth = mon.getMonth() === sun.getMonth();
+  return sameMonth
+    ? `${mon.getDate()}-${sun.getDate()} ${MONTHS[mon.getMonth()]}`
+    : `${mon.getDate()} ${MONTHS[mon.getMonth()]} - ${sun.getDate()} ${MONTHS[sun.getMonth()]}`;
 }
 
 function toWeekly(series, fields) {
@@ -28,7 +45,7 @@ function toWeekly(series, fields) {
     weeks[key]._rows.push(row);
   });
   return Object.values(weeks).sort((a, b) => a.date.localeCompare(b.date)).map(w => {
-    const out = { date: 'wk ' + w.date };
+    const out = { date: w.date, _isWeekStart: true };
     const rows = w._rows;
     const totalOrders = rows.reduce((s, r) => s + (r.orders || 0), 0);
     fields.forEach(f => {
@@ -50,6 +67,8 @@ function toWeekly(series, fields) {
   });
 }
 
+function round1_(n) { return Math.round(n * 10) / 10; }
+
 function baselineLineDataset(value, len) {
   if (value == null) return null;
   return {
@@ -59,8 +78,6 @@ function baselineLineDataset(value, len) {
     datalabels: { display: false },
   };
 }
-
-function round1_(n) { return Math.round(n * 10) / 10; }
 
 // Combo chart: light-blue bars = order volume (left axis), navy line = headline % metric (right axis)
 function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLineDatasets, tooltipExtra) {
@@ -83,11 +100,11 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
     },
     {
       type: 'line', label: pctLabel, yAxisID: 'yPct',
-      data: pctValues, borderColor: COLOR.line, backgroundColor: 'rgba(22,50,79,0.08)',
-      borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.line,
+      data: pctValues, borderColor: COLOR.navyLine, backgroundColor: 'rgba(22,50,79,0.08)',
+      borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.navyLine,
       pointBorderWidth: 2, tension: 0.3, fill: false, order: 1,
       datalabels: {
-        display: showLabels, align: 'top', offset: 8, color: COLOR.line,
+        display: showLabels, align: 'top', offset: 8, color: COLOR.navyLine,
         font: { size: 11, weight: '700' },
         formatter: v => v.toFixed(1) + '%',
       },
@@ -103,52 +120,59 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: {
-          display: true, position: 'top', reverse: false,
-          labels: { boxWidth: 12, font: { size: 11, weight: '600' }, usePointStyle: true },
+          display: true, position: 'top', align: 'start', reverse: false,
+          labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' },
         },
         tooltip: { callbacks: tooltipExtra ? { afterBody: tooltipExtra } : undefined },
       },
       scales: {
         yOrders: {
           position: 'left', beginAtZero: true,
-          title: { display: true, text: 'Orders', font: { size: 11 } },
+          title: { display: true, text: 'Orders', font: { size: 10 } },
           ticks: { font: { size: 10 } }, grid: { display: false },
         },
         yPct: {
           position: 'right', beginAtZero: true,
-          title: { display: true, text: '%', font: { size: 11 } },
+          title: { display: true, text: '%', font: { size: 10 } },
           ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#F0F4F8' },
         },
-        x: { ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45 }, grid: { display: false } },
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
       },
     },
   });
 }
 
-function makeLineOnlyChart(canvasId, labels, datasets, yLabel) {
+// Single-metric line chart, uniform light-blue theme
+function makeSingleLineChart(canvasId, labels, values, label, yLabel) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
   const showLabels = labels.length <= 10;
-  datasets.forEach(ds => {
-    ds.datalabels = ds.datalabels || {
-      display: showLabels, align: 'top', offset: 6, color: ds.borderColor,
-      font: { size: 10, weight: '700' },
-    };
-  });
   const ctx = canvas.getContext('2d');
   charts[canvasId] = new Chart(ctx, {
     type: 'line',
-    data: { labels, datasets },
+    data: {
+      labels,
+      datasets: [{
+        label, data: values,
+        borderColor: COLOR.singleLine, backgroundColor: 'rgba(79,179,232,0.10)',
+        borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff',
+        pointBorderColor: COLOR.singleLine, pointBorderWidth: 2, fill: true, tension: 0.3,
+        datalabels: {
+          display: showLabels, align: 'top', offset: 6, color: COLOR.singleLine,
+          font: { size: 10, weight: '700' },
+        },
+      }],
+    },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { display: datasets.length > 1, position: 'top', labels: { boxWidth: 12, font: { size: 11, weight: '600' }, usePointStyle: true } },
+        legend: { display: true, position: 'top', align: 'start', labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
       },
       scales: {
-        y: { title: { display: true, text: yLabel, font: { size: 11 } }, ticks: { font: { size: 10 } }, grid: { color: '#F0F4F8' } },
-        x: { ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45 }, grid: { display: false } },
+        y: { title: { display: true, text: yLabel, font: { size: 10 } }, ticks: { font: { size: 10 } }, grid: { color: '#F0F4F8' } },
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
       },
     },
   });
@@ -157,56 +181,66 @@ function makeLineOnlyChart(canvasId, labels, datasets, yLabel) {
 function chartCardsHTML(cityMeta) {
   return `
     <div class="chart-card">
-      <h3>Breach % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : '<span class="baseline-legend">No baseline set</span>'}</h3>
-      <div class="sub">Bars = order volume · Line = breach %</div>
+      <h3>Breach % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3>
       <div class="chart-canvas-wrap"><canvas id="chartBreach"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>Long Tail % (LM Induced) ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3>
-      <div class="sub">Bars = order volume · Line = long tail %</div>
       <div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>Cancellation %</h3>
-      <div class="sub">Bars = order volume · Line = cancellation % · No baseline set yet</div>
       <div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>NPS (Rolling 7 Days)</h3>
-      <div class="sub">No baseline set yet</div>
       <div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div>
     </div>
     <div class="chart-card">
-      <h3>Overall TAT (90th %ile)</h3>
-      <div class="sub">No baseline set yet</div>
+      <h3>Retry Rate</h3>
+      <div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div>
+    </div>
+    <div class="chart-card" style="visibility:hidden;"></div>
+
+    <div class="section-divider">Queue-Level TAT in Hrs (90th %ile)</div>
+
+    <div class="chart-card">
+      <h3>Overall TAT</h3>
       <div class="chart-canvas-wrap"><canvas id="chartTatOverall"></canvas></div>
     </div>
     <div class="chart-card">
-      <h3>SQ→MDQ (90th %ile)</h3>
-      <div class="sub">No baseline set yet</div>
+      <h3>SQ → MDQ</h3>
       <div class="chart-canvas-wrap"><canvas id="chartTatSqMdq"></canvas></div>
     </div>
     <div class="chart-card">
-      <h3>MDQ→Del (90th %ile)</h3>
-      <div class="sub">No baseline set yet</div>
+      <h3>MDQ → Del</h3>
       <div class="chart-canvas-wrap"><canvas id="chartTatMdqDel"></canvas></div>
     </div>
     <div class="chart-card">
-      <h3>ETA (90th %ile)</h3>
-      <div class="sub">No baseline set yet</div>
+      <h3>ETA</h3>
       <div class="chart-canvas-wrap"><canvas id="chartTatEta"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <h3>Retry Rate</h3>
-      <div class="sub">Bars = OFD orders · Line = retry %</div>
-      <div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div>
+    </div>`;
+}
+
+function orderSummaryHTML(orderSummary) {
+  if (!orderSummary) return '';
+  return `
+    <div class="scorecard-row">
+      <div class="scorecard">
+        <div class="scorecard-label">Total Orders <span class="scorecard-date">(${fmtDayLabel(orderSummary.date)})</span></div>
+        <div class="scorecard-value">${orderSummary.total.toLocaleString()}</div>
+        <div class="scorecard-breakdown">
+          <span><span class="dot qc"></span>QC: ${orderSummary.qc.toLocaleString()}</span>
+          <span><span class="dot nonqc"></span>Non-QC: ${orderSummary.nonQc.toLocaleString()}</span>
+        </div>
+      </div>
     </div>`;
 }
 
 function renderCityCharts(cityMeta, rawSeries, period) {
   const fields = ['breachPct','ltPct','cancellationPct','nps','overallTat','sqToMdq','mdqToDel','eta','retryRate'];
   const series = period === 'WoW' ? toWeekly(rawSeries, fields) : rawSeries;
-  const labels = series.map(r => r.date);
+  const labels = series.map(r => period === 'WoW' ? fmtWeekLabel(r.date) : fmtDayLabel(r.date));
   const orders = series.map(r => r.orders);
 
   const breachPct = series.map(r => round1_(r.breachPct * 100));
@@ -223,46 +257,17 @@ function renderCityCharts(cityMeta, rawSeries, period) {
   const cancelPct = series.map(r => round1_(r.cancellationPct * 100));
   makeComboChart('chartCancel', labels, orders, cancelPct, 'Cancellation %', null);
 
-  makeLineOnlyChart('chartNps', labels, [{
-    label: 'NPS (rolling 7d)', data: series.map(r => r.nps),
-    borderColor: COLOR.nps, backgroundColor: 'rgba(30,132,73,0.10)', borderWidth: 3,
-    pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.nps, pointBorderWidth: 2,
-    fill: true, tension: 0.3,
-  }], 'Score');
-
-  makeLineOnlyChart('chartTatOverall', labels, [{
-    label: 'Overall TAT (min)', data: series.map(r => r.overallTat),
-    borderColor: '#16324F', backgroundColor: 'rgba(22,50,79,0.08)', borderWidth: 3,
-    pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: '#16324F', pointBorderWidth: 2,
-    fill: true, tension: 0.3,
-  }], 'Minutes');
-
-  makeLineOnlyChart('chartTatSqMdq', labels, [{
-    label: 'SQ→MDQ (min)', data: series.map(r => r.sqToMdq),
-    borderColor: '#D68910', backgroundColor: 'rgba(214,137,16,0.08)', borderWidth: 3,
-    pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: '#D68910', pointBorderWidth: 2,
-    fill: true, tension: 0.3,
-  }], 'Minutes');
-
-  makeLineOnlyChart('chartTatMdqDel', labels, [{
-    label: 'MDQ→Del (min)', data: series.map(r => r.mdqToDel),
-    borderColor: '#8E44AD', backgroundColor: 'rgba(142,68,173,0.08)', borderWidth: 3,
-    pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: '#8E44AD', pointBorderWidth: 2,
-    fill: true, tension: 0.3,
-  }], 'Minutes');
-
-  makeLineOnlyChart('chartTatEta', labels, [{
-    label: 'ETA (min)', data: series.map(r => r.eta),
-    borderColor: '#E74C3C', backgroundColor: 'rgba(231,76,60,0.08)', borderWidth: 3,
-    pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: '#E74C3C', pointBorderWidth: 2,
-    fill: true, tension: 0.3,
-  }], 'Minutes');
-
   const retryPct = series.map(r => (r.retryRate != null ? round1_(r.retryRate * 100) : null));
   makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), retryPct, 'Retry %', null, (items) => {
     const r = series[items[0].dataIndex];
     return [`Retries: ${r.retries ?? '—'} of ${r.ofdOrders ?? '—'} OFD orders`];
   });
+
+  makeSingleLineChart('chartNps', labels, series.map(r => r.nps), 'NPS', 'Score');
+  makeSingleLineChart('chartTatOverall', labels, series.map(r => r.overallTat), 'Overall TAT (min)', 'Minutes');
+  makeSingleLineChart('chartTatSqMdq', labels, series.map(r => r.sqToMdq), 'SQ→MDQ (min)', 'Minutes');
+  makeSingleLineChart('chartTatMdqDel', labels, series.map(r => r.mdqToDel), 'MDQ→Del (min)', 'Minutes');
+  makeSingleLineChart('chartTatEta', labels, series.map(r => r.eta), 'ETA (min)', 'Minutes');
 }
 
 async function fetchCityData(city, service) {
