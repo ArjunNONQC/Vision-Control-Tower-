@@ -31,6 +31,7 @@
 </div>
 
 <div class="container">
+  <div id="scorecardHolder"></div>
   <div id="chartGrid" class="chart-grid"><div class="loading">Pick a city above to see its metrics.</div></div>
 </div>
 
@@ -77,6 +78,7 @@ async function loadSelectedCity() {
     const data = await fetchCityData(city, service);
     cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
     rawSeries = data.series;
+    document.getElementById('scorecardHolder').innerHTML = orderSummaryHTML(data.orderSummary);
     document.getElementById('chartGrid').innerHTML = chartCardsHTML(cityMeta);
     renderCityCharts(cityMeta, rawSeries, period);
   } catch (err) {
