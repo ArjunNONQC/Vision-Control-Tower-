@@ -19,6 +19,8 @@
 
 * { box-sizing: border-box; }
 
+a { color: inherit; text-decoration: none; }
+
 body {
   margin: 0;
   font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
@@ -284,4 +286,29 @@ select.control-select {
   height: 0;
   border-top: 2px dashed var(--red);
   display: inline-block;
+}
+
+/* Password lock screen */
+.lock-screen {
+  position: fixed; inset: 0; z-index: 1000;
+  background: linear-gradient(135deg, var(--header-blue) 0%, var(--header-blue-2) 100%);
+  display: flex; align-items: center; justify-content: center;
+}
+
+.lock-box {
+  background: #fff; border-radius: 16px; padding: 36px 32px;
+  width: 320px; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+}
+
+.lock-box h2 { margin: 0 0 6px; font-size: 18px; color: var(--header-blue); font-weight: 800; }
+.lock-box p { margin: 0 0 18px; font-size: 13px; color: var(--text-muted); }
+
+.lock-box input {
+  width: 100%; padding: 11px 14px; border-radius: 8px; border: 1px solid var(--border);
+  font-size: 14px; margin-bottom: 12px; outline: none;
+}
+.lock-box input:focus { border-color: var(--header-blue-2); }
+
+.lock-error {
+  color: var(--red); font-size: 12px; margin-top: 10px; min-height: 16px; font-weight: 600;
 }
