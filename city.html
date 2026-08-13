@@ -30,6 +30,7 @@
 <div class="container">
   <div id="scorecardHolder"></div>
   <div id="chartGrid" class="chart-grid"><div class="loading">Loading…</div></div>
+  <div id="storeListHolder"></div>
 </div>
 
 <script src="config.js?v=2"></script>
@@ -58,22 +59,37 @@ document.getElementById('periodToggle').addEventListener('click', (e) => {
   [...e.currentTarget.children].forEach(b => b.classList.remove('active'));
   e.target.classList.add('active');
   period = e.target.dataset.val;
-  renderCityCharts(cityMeta, rawSeries, period);
+  renderForService();
 });
+
+function renderForService() {
+  if (service === 'QC') renderQcCharts(cityMeta, rawSeries, period);
+  else renderNonQcCharts(cityMeta, rawSeries, period);
+}
 
 async function load() {
   document.getElementById('chartGrid').innerHTML = '<div class="loading">Loading…</div>';
+  document.getElementById('storeListHolder').innerHTML = '';
   try {
     const data = await fetchCityData(CITY, service);
     cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
     rawSeries = data.series;
     document.getElementById('cityTitle').textContent = `${CITY} — ${service}`;
-    document.getElementById('scorecardHolder').innerHTML = statPanelsHTML(data.orderSummary, data.coldChain);
-    document.getElementById('chartGrid').innerHTML = chartCardsHTML(cityMeta);
-    renderCityCharts(cityMeta, rawSeries, period);
+
+    const ageingLabel = data.ageing ? 'D-1, latest' : null;
+    document.getElementById('scorecardHolder').innerHTML =
+      statPanelsHTML(data.orderSummary, data.coldChain, data.ageing, ageingLabel);
+
+    document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
+    renderForService();
+
+    if (service === 'QC') {
+      fetchStoresData(CITY).then(sd => {
+        document.getElementById('storeListHolder').innerHTML = storeListHTML(sd);
+      }).catch(() => {});
+    }
   } catch (err) {
-    document.getElementById('chartGrid').innerHTML =
-      `<div class="empty-state">Couldn't load data: ${err.message}</div>`;
+    document.getElementById('chartGrid').innerHTML = loadErrorHTML(err.message, 'load');
   }
 }
 load();
