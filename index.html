@@ -40,6 +40,7 @@
 
 <div class="container">
   <div id="diagBanner"></div>
+  <div id="panIndiaAgeing" class="scorecard-row"></div>
   <div class="section-label">Needs attention</div>
   <div id="breachGrid" class="card-grid"><div class="loading">Loading…</div></div>
 
@@ -160,6 +161,9 @@ async function load() {
     document.getElementById('asOfLabel').textContent =
       data.period === 'DoD' ? `As of ${data.asOf}` : `Week ending ${data.asOf}`;
 
+    document.getElementById('panIndiaAgeing').innerHTML =
+      ageingHTML(data.ageing, `Pan-India, ${data.service}`);
+
     const grid = document.getElementById('breachGrid');
     if (!data.cities.length) {
       grid.innerHTML = '<div class="empty-state">No breached cities in this view.</div>';
@@ -177,7 +181,7 @@ async function load() {
     }
   } catch (err) {
     document.getElementById('breachGrid').innerHTML =
-      `<div class="empty-state">Couldn't load data: ${err.message}. Check WEBAPP_URL in config.js and that the Apps Script is deployed.</div>`;
+      loadErrorHTML(err.message + '. Check WEBAPP_URL in config.js and that the Apps Script is deployed.', 'load');
   }
 }
 
