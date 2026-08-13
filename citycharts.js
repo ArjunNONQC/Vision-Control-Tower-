@@ -236,6 +236,50 @@ function orderSummaryHTML(orderSummary) {
     </div>`;
 }
 
+function coldChainHTML(coldChain) {
+  if (!coldChain) return '';
+  const pct = v => (v * 100).toFixed(1) + '%';
+  return `
+    <div class="scorecard cold-scorecard">
+      <div class="scorecard-label">Cold Chain Breach <span class="scorecard-date">(${coldChain.dateRange})</span></div>
+      <div class="scorecard-value">${pct(coldChain.breachPct)} <span class="scorecard-sub">of ${coldChain.totalTrips} trips</span></div>
+      <div class="cold-breakdown">
+        <div class="cold-bar-row">
+          <span class="cold-bar-label">High only (&gt;8°C)</span>
+          <div class="cold-bar-track"><div class="cold-bar-fill high" style="width:${(coldChain.highOnlyPct*100).toFixed(1)}%"></div></div>
+          <span class="cold-bar-val">${coldChain.highOnly} (${pct(coldChain.highOnlyPct)})</span>
+        </div>
+        <div class="cold-bar-row">
+          <span class="cold-bar-label">Low only (&lt;2°C)</span>
+          <div class="cold-bar-track"><div class="cold-bar-fill low" style="width:${(coldChain.lowOnlyPct*100).toFixed(1)}%"></div></div>
+          <span class="cold-bar-val">${coldChain.lowOnly} (${pct(coldChain.lowOnlyPct)})</span>
+        </div>
+        <div class="cold-bar-row">
+          <span class="cold-bar-label">Both breaches</span>
+          <div class="cold-bar-track"><div class="cold-bar-fill both" style="width:${(coldChain.bothPct*100).toFixed(1)}%"></div></div>
+          <span class="cold-bar-val">${coldChain.both} (${pct(coldChain.bothPct)})</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function statPanelsHTML(orderSummary, coldChain) {
+  const cold = coldChainHTML(coldChain);
+  return `
+    <div class="scorecard-row">
+      ${orderSummary ? `
+      <div class="scorecard">
+        <div class="scorecard-label">Total Orders <span class="scorecard-date">(${fmtDayLabel(orderSummary.date)})</span></div>
+        <div class="scorecard-value">${orderSummary.total.toLocaleString()}</div>
+        <div class="scorecard-breakdown">
+          <span><span class="dot qc"></span>QC: ${orderSummary.qc.toLocaleString()}</span>
+          <span><span class="dot nonqc"></span>Non-QC: ${orderSummary.nonQc.toLocaleString()}</span>
+        </div>
+      </div>` : ''}
+      ${cold}
+    </div>`;
+}
+
 function renderCityCharts(cityMeta, rawSeries, period) {
   const fields = ['breachPct','ltPct','cancellationPct','nps','overallTat','sqToMdq','mdqToDel','eta','retryRate'];
   const series = period === 'WoW' ? toWeekly(rawSeries, fields) : rawSeries;
@@ -271,8 +315,24 @@ function renderCityCharts(cityMeta, rawSeries, period) {
 
 async function fetchCityData(city, service) {
   const url = `${WEBAPP_URL}?action=city&city=${encodeURIComponent(city)}&service=${encodeURIComponent(service)}`;
+  return cachedFetchJSON(url);
+}
+
+// Browser-side response cache (sessionStorage, 5 min TTL) — avoids re-hitting the
+// Apps Script backend when toggling between views you've already loaded this session.
+async function cachedFetchJSON(url, ttlMs) {
+  ttlMs = ttlMs || 5 * 60 * 1000;
+  const key = 'visioncache:' + url;
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(key));
+    if (cached && (Date.now() - cached.ts) < ttlMs) return cached.data;
+  } catch (e) { /* ignore bad cache entry */ }
+
   const res = await fetch(url);
   const data = await res.json();
   if (data.error) throw new Error(data.error);
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+  } catch (e) { /* sessionStorage full or unavailable — fine, just skip caching */ }
   return data;
 }
