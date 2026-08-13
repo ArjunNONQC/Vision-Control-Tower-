@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vision — Store Detail</title>
+<link rel="stylesheet" href="style.css?v=4" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <a class="nav-btn" href="index.html">← Vision Home</a>
+    <h1 id="storeTitle">Loading…</h1>
+  </div>
+  <div class="controls">
+    <div class="toggle-group" id="periodToggle">
+      <button data-val="DoD" class="active">DoD</button>
+      <button data-val="WoW">WoW</button>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div id="chartGrid" class="chart-grid"><div class="loading">Loading…</div></div>
+</div>
+
+<script src="config.js?v=2"></script>
+<script src="citycharts.js?v=4"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+const STORE_CODE = params.get('store');
+let period = 'DoD';
+let rawSeries = null;
+
+document.getElementById('periodToggle').addEventListener('click', (e) => {
+  if (e.target.tagName !== 'BUTTON') return;
+  [...e.currentTarget.children].forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  period = e.target.dataset.val;
+  renderStoreCharts(rawSeries, period);
+});
+
+async function load() {
+  document.getElementById('chartGrid').innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const data = await fetchStoreData(STORE_CODE);
+    rawSeries = data.series;
+    document.getElementById('storeTitle').textContent = `${data.storeCode} — ${data.city} (QC)`;
+    document.getElementById('chartGrid').innerHTML = storeChartCardsHTML();
+    renderStoreCharts(rawSeries, period);
+  } catch (err) {
+    document.getElementById('chartGrid').innerHTML = loadErrorHTML(err.message, 'load');
+  }
+}
+load();
+</script>
+</body>
+</html>
