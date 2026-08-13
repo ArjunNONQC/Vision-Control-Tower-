@@ -344,22 +344,47 @@ function storeListHTML(storesPayload) {
     </div>`;
 }
 
-// ======================= NETWORK (cached + retrying) =======================
-async function cachedFetchJSON(url, ttlMs) {
-  ttlMs = ttlMs || 5 * 60 * 1000;
+// ======================= NETWORK (localStorage cache + stale-while-revalidate + retrying) =======================
+// Fresh cache (< ttlMs old): return instantly, no network call.
+// Stale-but-usable cache (< staleMs old): return the stale data immediately so the
+// page paints right away, AND kick off a background refetch; if onRevalidate is
+// given, it's called with the fresh data once that background fetch completes so
+// the page can silently upgrade from stale to fresh — this is the actual trick
+// behind dashboards that "feel" instant, borrowed from the Heimdall dashboard's
+// pattern of rendering from already-held state instead of blocking on network.
+// No usable cache at all: falls back to a normal blocking fetch (with retries).
+async function cachedFetchJSON(url, opts) {
+  if (typeof opts === 'number') opts = { ttlMs: opts }; // back-compat with old (url, ttlMs) callers
+  opts = opts || {};
+  const ttlMs = opts.ttlMs || 5 * 60 * 1000;
+  const staleMs = opts.staleMs || 24 * 60 * 60 * 1000; // still shown instantly while revalidating
   const key = 'visioncache:' + url;
-  try {
-    const cached = JSON.parse(sessionStorage.getItem(key));
-    if (cached && (Date.now() - cached.ts) < ttlMs) return cached.data;
-  } catch (e) { /* ignore bad cache entry */ }
 
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem(key)); } catch (e) { /* ignore corrupt entry */ }
+
+  const age = cached ? Date.now() - cached.ts : Infinity;
+  if (cached && age < ttlMs) return cached.data; // fresh — no network needed at all
+
+  if (cached && age < staleMs) {
+    // Stale but usable: hand back what we have right now, refresh quietly behind it
+    fetchAndCache_(url, key).then(fresh => {
+      if (opts.onRevalidate) opts.onRevalidate(fresh);
+    }).catch(() => { /* background revalidation failure is non-fatal — stale data stays on screen */ });
+    return cached.data;
+  }
+
+  return fetchAndCache_(url, key); // nothing usable cached — must block on a real fetch
+}
+
+async function fetchAndCache_(url, key) {
   let lastErr;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetch(url);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      try { sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch (e) {}
+      try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch (e) { /* storage full — skip caching */ }
       return data;
     } catch (e) {
       lastErr = e;
@@ -369,14 +394,14 @@ async function cachedFetchJSON(url, ttlMs) {
   throw lastErr;
 }
 
-async function fetchCityData(city, service) {
-  return cachedFetchJSON(`${WEBAPP_URL}?action=city&city=${encodeURIComponent(city)}&service=${encodeURIComponent(service)}`);
+async function fetchCityData(city, service, onRevalidate) {
+  return cachedFetchJSON(`${WEBAPP_URL}?action=city&city=${encodeURIComponent(city)}&service=${encodeURIComponent(service)}`, { onRevalidate });
 }
 async function fetchStoresData(city) {
   return cachedFetchJSON(`${WEBAPP_URL}?action=stores&city=${encodeURIComponent(city)}`);
 }
-async function fetchStoreData(storeCode) {
-  return cachedFetchJSON(`${WEBAPP_URL}?action=store&storeCode=${encodeURIComponent(storeCode)}`);
+async function fetchStoreData(storeCode, onRevalidate) {
+  return cachedFetchJSON(`${WEBAPP_URL}?action=store&storeCode=${encodeURIComponent(storeCode)}`, { onRevalidate });
 }
 
 // Runs a growing list of async tasks with a concurrency cap. Tasks are allowed
