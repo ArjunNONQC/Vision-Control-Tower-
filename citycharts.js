@@ -379,6 +379,44 @@ async function fetchStoreData(storeCode) {
   return cachedFetchJSON(`${WEBAPP_URL}?action=store&storeCode=${encodeURIComponent(storeCode)}`);
 }
 
+// Runs a growing list of async tasks with a concurrency cap. Tasks are allowed
+// to push MORE tasks onto the same queue while running (used below so store
+// list fetches can enqueue individual store fetches once they know what exists).
+async function runWithConcurrency_(tasks, limit) {
+  let i = 0;
+  const workers = Array(Math.min(limit, tasks.length || 1)).fill(0).map(async () => {
+    while (i < tasks.length) {
+      const idx = i++;
+      try { await tasks[idx](); } catch (e) { /* best-effort background prefetch — ignore failures */ }
+    }
+  });
+  await Promise.all(workers);
+}
+
+// Silently warms the browser cache for every city (and every QC store) right
+// after the home page renders, so clicking into any city or store later is
+// served instantly from sessionStorage instead of hitting the network.
+async function prefetchAllCitiesAndStores() {
+  try {
+    const meta = await cachedFetchJSON(`${WEBAPP_URL}?action=meta`, 10 * 60 * 1000);
+    const tasks = [];
+    Object.entries(meta.citiesByService || {}).forEach(([service, cities]) => {
+      cities.forEach(city => {
+        tasks.push(() => fetchCityData(city, service));
+        if (service === 'QC') {
+          tasks.push(async () => {
+            const sd = await fetchStoresData(city);
+            if (sd && sd.stores) {
+              sd.stores.forEach(s => tasks.push(() => fetchStoreData(s.storeCode)));
+            }
+          });
+        }
+      });
+    });
+    await runWithConcurrency_(tasks, 4); // cap concurrent requests so we don't hammer the Apps Script quota
+  } catch (e) { /* background warming is best-effort — a failure here shouldn't affect the visible page */ }
+}
+
 function loadErrorHTML(message, retryFnName) {
   return `<div class="empty-state">Couldn't load data: ${message}
     <div style="margin-top:10px;"><button class="nav-btn" style="background:var(--header-blue);border:none;" onclick="${retryFnName}()">Retry</button></div>
