@@ -37,7 +37,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=5"></script>
+<script src="citycharts.js?v=6"></script>
 <script>
 let period = 'DoD';
 let service = 'Non-QC Inhouse';
@@ -85,13 +85,8 @@ async function loadSelectedCity() {
   document.getElementById('chartGrid').innerHTML = '<div class="loading">Loading…</div>';
   document.getElementById('storeListHolder').innerHTML = '';
   try {
-    const data = await fetchCityData(city, service);
-    cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
-    rawSeries = data.series;
-    document.getElementById('scorecardHolder').innerHTML =
-      statPanelsHTML(data.orderSummary, data.coldChain, data.ageing, data.ageing ? 'D-1, latest' : null);
-    document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
-    renderForService();
+    const data = await fetchCityData(city, service, renderExploreData);
+    renderExploreData(data);
     if (service === 'QC') {
       fetchStoresData(city).then(sd => {
         document.getElementById('storeListHolder').innerHTML = storeListHTML(sd);
@@ -100,6 +95,15 @@ async function loadSelectedCity() {
   } catch (err) {
     document.getElementById('chartGrid').innerHTML = loadErrorHTML(err.message, 'loadSelectedCity');
   }
+}
+
+function renderExploreData(data) {
+  cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
+  rawSeries = data.series;
+  document.getElementById('scorecardHolder').innerHTML =
+    statPanelsHTML(data.orderSummary, data.coldChain, data.ageing, data.ageing ? 'D-1, latest' : null);
+  document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
+  renderForService();
 }
 
 async function init() {
