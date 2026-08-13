@@ -34,7 +34,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=5"></script>
+<script src="citycharts.js?v=6"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const CITY = params.get('city');
@@ -71,18 +71,8 @@ async function load() {
   document.getElementById('chartGrid').innerHTML = '<div class="loading">Loading…</div>';
   document.getElementById('storeListHolder').innerHTML = '';
   try {
-    const data = await fetchCityData(CITY, service);
-    cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
-    rawSeries = data.series;
-    document.getElementById('cityTitle').textContent = `${CITY} — ${service}`;
-
-    const ageingLabel = data.ageing ? 'D-1, latest' : null;
-    document.getElementById('scorecardHolder').innerHTML =
-      statPanelsHTML(data.orderSummary, data.coldChain, data.ageing, ageingLabel);
-
-    document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
-    renderForService();
-
+    const data = await fetchCityData(CITY, service, renderCityData);
+    renderCityData(data);
     if (service === 'QC') {
       fetchStoresData(CITY).then(sd => {
         document.getElementById('storeListHolder').innerHTML = storeListHTML(sd);
@@ -91,6 +81,19 @@ async function load() {
   } catch (err) {
     document.getElementById('chartGrid').innerHTML = loadErrorHTML(err.message, 'load');
   }
+}
+
+function renderCityData(data) {
+  cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
+  rawSeries = data.series;
+  document.getElementById('cityTitle').textContent = `${CITY} — ${service}`;
+
+  const ageingLabel = data.ageing ? 'D-1, latest' : null;
+  document.getElementById('scorecardHolder').innerHTML =
+    statPanelsHTML(data.orderSummary, data.coldChain, data.ageing, ageingLabel);
+
+  document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
+  renderForService();
 }
 load();
 </script>
