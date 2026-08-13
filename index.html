@@ -51,7 +51,7 @@
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=4"></script>
+<script src="citycharts.js?v=5"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -179,10 +179,19 @@ async function load() {
         `<div class="trend-chip" onclick="goToCity('${c.city}','${c.service}')">${c.city}</div>`
       ).join('');
     }
+
+    startBackgroundPrefetch();
   } catch (err) {
     document.getElementById('breachGrid').innerHTML =
       loadErrorHTML(err.message + '. Check WEBAPP_URL in config.js and that the Apps Script is deployed.', 'load');
   }
+}
+
+let prefetchStarted = false;
+function startBackgroundPrefetch() {
+  if (prefetchStarted) return; // only ever run once per session, not on every toggle click
+  prefetchStarted = true;
+  setTimeout(() => prefetchAllCitiesAndStores(), 300); // let the home page finish painting first
 }
 
 initLock();
