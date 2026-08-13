@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Vision — Explore All Cities</title>
-<link rel="stylesheet" href="style.css?v=3" />
+<link rel="stylesheet" href="style.css?v=4" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -36,7 +36,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=2"></script>
+<script src="citycharts.js?v=4"></script>
 <script>
 let period = 'DoD';
 let cityMeta = {}, rawSeries = null;
@@ -78,7 +78,7 @@ async function loadSelectedCity() {
     const data = await fetchCityData(city, service);
     cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
     rawSeries = data.series;
-    document.getElementById('scorecardHolder').innerHTML = orderSummaryHTML(data.orderSummary);
+    document.getElementById('scorecardHolder').innerHTML = statPanelsHTML(data.orderSummary, data.coldChain);
     document.getElementById('chartGrid').innerHTML = chartCardsHTML(cityMeta);
     renderCityCharts(cityMeta, rawSeries, period);
   } catch (err) {
@@ -88,8 +88,7 @@ async function loadSelectedCity() {
 
 async function init() {
   try {
-    const res = await fetch(`${WEBAPP_URL}?action=meta`);
-    const meta = await res.json();
+    const meta = await cachedFetchJSON(`${WEBAPP_URL}?action=meta`);
     if (meta.error) throw new Error(meta.error);
     citiesByService = meta.citiesByService || {};
     populateCityDropdown(serviceSelect.value);
