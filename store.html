@@ -28,7 +28,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=5"></script>
+<script src="citycharts.js?v=6"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const STORE_CODE = params.get('store');
@@ -46,14 +46,18 @@ document.getElementById('periodToggle').addEventListener('click', (e) => {
 async function load() {
   document.getElementById('chartGrid').innerHTML = '<div class="loading">Loading…</div>';
   try {
-    const data = await fetchStoreData(STORE_CODE);
-    rawSeries = data.series;
-    document.getElementById('storeTitle').textContent = `${data.storeCode} — ${data.city} (QC)`;
-    document.getElementById('chartGrid').innerHTML = storeChartCardsHTML();
-    renderStoreCharts(rawSeries, period);
+    const data = await fetchStoreData(STORE_CODE, renderStoreData);
+    renderStoreData(data);
   } catch (err) {
     document.getElementById('chartGrid').innerHTML = loadErrorHTML(err.message, 'load');
   }
+}
+
+function renderStoreData(data) {
+  rawSeries = data.series;
+  document.getElementById('storeTitle').textContent = `${data.storeCode} — ${data.city} (QC)`;
+  document.getElementById('chartGrid').innerHTML = storeChartCardsHTML();
+  renderStoreCharts(rawSeries, period);
 }
 load();
 </script>
