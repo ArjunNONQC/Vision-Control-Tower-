@@ -33,12 +33,14 @@
 <div class="container">
   <div id="scorecardHolder"></div>
   <div id="chartGrid" class="chart-grid"><div class="loading">Pick a city above to see its metrics.</div></div>
+  <div id="storeListHolder"></div>
 </div>
 
 <script src="config.js?v=2"></script>
 <script src="citycharts.js?v=4"></script>
 <script>
 let period = 'DoD';
+let service = 'Non-QC Inhouse';
 let cityMeta = {}, rawSeries = null;
 let citiesByService = {};
 
@@ -50,51 +52,64 @@ document.getElementById('periodToggle').addEventListener('click', (e) => {
   [...e.currentTarget.children].forEach(b => b.classList.remove('active'));
   e.target.classList.add('active');
   period = e.target.dataset.val;
-  if (rawSeries) renderCityCharts(cityMeta, rawSeries, period);
+  if (rawSeries) renderForService();
 });
 
 serviceSelect.addEventListener('change', () => {
-  populateCityDropdown(serviceSelect.value);
+  service = serviceSelect.value;
+  populateCityDropdown(service);
   loadSelectedCity();
 });
 citySelect.addEventListener('change', loadSelectedCity);
 
-function populateCityDropdown(service) {
-  const cities = citiesByService[service] || [];
+function populateCityDropdown(svc) {
+  const cities = citiesByService[svc] || [];
   citySelect.innerHTML = cities.length
     ? cities.map(c => `<option value="${c}">${c}</option>`).join('')
     : '<option>No cities found</option>';
 }
 
+function renderForService() {
+  if (service === 'QC') renderQcCharts(cityMeta, rawSeries, period);
+  else renderNonQcCharts(cityMeta, rawSeries, period);
+}
+
 async function loadSelectedCity() {
   const city = citySelect.value;
-  const service = serviceSelect.value;
   if (!city || city === 'No cities found') {
     document.getElementById('chartGrid').innerHTML = '<div class="empty-state">No data available for this service yet.</div>';
+    document.getElementById('scorecardHolder').innerHTML = '';
+    document.getElementById('storeListHolder').innerHTML = '';
     return;
   }
   document.getElementById('chartGrid').innerHTML = '<div class="loading">Loading…</div>';
+  document.getElementById('storeListHolder').innerHTML = '';
   try {
     const data = await fetchCityData(city, service);
     cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
     rawSeries = data.series;
-    document.getElementById('scorecardHolder').innerHTML = statPanelsHTML(data.orderSummary, data.coldChain);
-    document.getElementById('chartGrid').innerHTML = chartCardsHTML(cityMeta);
-    renderCityCharts(cityMeta, rawSeries, period);
+    document.getElementById('scorecardHolder').innerHTML =
+      statPanelsHTML(data.orderSummary, data.coldChain, data.ageing, data.ageing ? 'D-1, latest' : null);
+    document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
+    renderForService();
+    if (service === 'QC') {
+      fetchStoresData(city).then(sd => {
+        document.getElementById('storeListHolder').innerHTML = storeListHTML(sd);
+      }).catch(() => {});
+    }
   } catch (err) {
-    document.getElementById('chartGrid').innerHTML = `<div class="empty-state">Couldn't load data: ${err.message}</div>`;
+    document.getElementById('chartGrid').innerHTML = loadErrorHTML(err.message, 'loadSelectedCity');
   }
 }
 
 async function init() {
   try {
     const meta = await cachedFetchJSON(`${WEBAPP_URL}?action=meta`);
-    if (meta.error) throw new Error(meta.error);
     citiesByService = meta.citiesByService || {};
     populateCityDropdown(serviceSelect.value);
     loadSelectedCity();
   } catch (err) {
-    document.getElementById('chartGrid').innerHTML = `<div class="empty-state">Couldn't load city list: ${err.message}</div>`;
+    document.getElementById('chartGrid').innerHTML = loadErrorHTML('Couldn\'t load city list: ' + err.message, 'init');
   }
 }
 init();
