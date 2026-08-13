@@ -337,6 +337,9 @@ select.control-select {
 /* Order summary scorecard */
 .scorecard-row {
   margin: 18px 0 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .scorecard {
@@ -383,3 +386,39 @@ select.control-select {
 }
 .dot.qc { background: #4FB3E8; }
 .dot.nonqc { background: #16324F; }
+
+/* Cold chain breach panel */
+.cold-scorecard { min-width: 340px; }
+
+.scorecard-sub { font-size: 13px; font-weight: 500; color: var(--text-muted); }
+
+.cold-breakdown {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cold-bar-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 90px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.cold-bar-label { color: var(--text-muted); font-weight: 600; }
+
+.cold-bar-track {
+  height: 8px;
+  background: #EEF2F6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cold-bar-fill { height: 100%; border-radius: 6px; }
+.cold-bar-fill.high { background: #E74C3C; }
+.cold-bar-fill.low { background: #4FB3E8; }
+.cold-bar-fill.both { background: #8E44AD; }
+
+.cold-bar-val { text-align: right; font-weight: 700; color: var(--text); }
