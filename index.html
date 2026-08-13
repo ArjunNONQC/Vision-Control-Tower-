@@ -51,7 +51,7 @@
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=5"></script>
+<script src="citycharts.js?v=6"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -143,8 +143,16 @@ async function load() {
   document.getElementById('trendStrip').innerHTML = '';
   try {
     const url = `${WEBAPP_URL}?action=home&service=${encodeURIComponent(state.service)}&period=${state.period}`;
-    const data = await cachedFetchJSON(url);
+    const data = await cachedFetchJSON(url, { onRevalidate: renderHomeData });
+    renderHomeData(data);
+  } catch (err) {
+    document.getElementById('breachGrid').innerHTML =
+      loadErrorHTML(err.message + '. Check WEBAPP_URL in config.js and that the Apps Script is deployed.', 'load');
+  }
+}
 
+function renderHomeData(data) {
+  try {
     const diagBanner = document.getElementById('diagBanner');
     if (data.diagnostic) {
       // asOf came back null — no rows matched this service at all
