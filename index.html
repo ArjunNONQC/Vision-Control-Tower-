@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Vision — City Performance Tracker</title>
-<link rel="stylesheet" href="style.css?v=3" />
+<link rel="stylesheet" href="style.css?v=4" />
 </head>
 <body>
 
@@ -50,6 +50,7 @@
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
+<script src="citycharts.js?v=4"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -141,9 +142,7 @@ async function load() {
   document.getElementById('trendStrip').innerHTML = '';
   try {
     const url = `${WEBAPP_URL}?action=home&service=${encodeURIComponent(state.service)}&period=${state.period}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    const data = await cachedFetchJSON(url);
 
     const diagBanner = document.getElementById('diagBanner');
     if (data.diagnostic) {
