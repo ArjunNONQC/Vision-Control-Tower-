@@ -577,8 +577,9 @@ select.control-select {
 
 .store-row {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1fr;
-  padding: 12px 18px;
+  grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr;
+  padding: 10px 18px;
+  align-items: center;
   font-size: 13px;
   border-top: 1px solid #F0F4F8;
   cursor: pointer;
