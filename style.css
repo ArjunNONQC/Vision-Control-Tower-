@@ -424,6 +424,9 @@ select.control-select {
 .cold-bar-fill.high { background: #E74C3C; }
 .cold-bar-fill.low { background: #4FB3E8; }
 .cold-bar-fill.both { background: #8E44AD; }
+.cold-bar-fill.rag-green { background: var(--green); }
+.cold-bar-fill.rag-amber { background: var(--amber); }
+.cold-bar-fill.rag-red { background: var(--red); }
 
 .cold-bar-val { text-align: right; font-weight: 700; color: var(--text); }
 
@@ -437,12 +440,18 @@ select.control-select {
   display: flex;
   align-items: center;
   gap: 28px;
-  background: #fff;
+  background: linear-gradient(135deg, #fff 0%, #F3F8FD 100%);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px 24px;
+  border-radius: 14px;
+  padding: 18px 26px;
   margin: 18px 0 6px;
-  box-shadow: 0 4px 16px rgba(22, 50, 79, 0.08);
+  box-shadow: 0 6px 20px rgba(22, 50, 79, 0.10);
+}
+
+.pan-india-icon {
+  font-size: 28px;
+  line-height: 1;
+  filter: saturate(1.3);
 }
 
 .pan-india-total {
@@ -494,6 +503,10 @@ select.control-select {
   font-weight: 600;
   margin-top: 2px;
 }
+
+.pan-india-bucket-val.rag-green-text { color: var(--green); }
+.pan-india-bucket-val.rag-amber-text { color: var(--amber); }
+.pan-india-bucket-val.rag-red-text { color: var(--red); }
 
 .pan-india-empty {
   color: var(--text-muted);
