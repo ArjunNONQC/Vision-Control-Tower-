@@ -13,6 +13,10 @@ const COLOR = {
 if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
   Chart.register(ChartDataLabels);
   Chart.defaults.animation.duration = 250; // snappier rendering, was default 1000ms
+  // Keep every datalabel inside the chart's plot area — without this, a label
+  // near the top (e.g. 100%) or bottom (e.g. 0%) of a chart spills out into
+  // the legend row above or the x-axis tick labels below, overlapping them.
+  Chart.defaults.set('plugins.datalabels', { clamp: true });
 }
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -80,18 +84,18 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
     { type: 'bar', label: 'Orders', yAxisID: 'yOrders', data: orders, backgroundColor: COLOR.bar,
       borderColor: COLOR.barBorder, borderWidth: 1, borderRadius: 4, order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
       datalabels: { display: showLabels, anchor: 'end', align: 'top', color: '#3E7CA6', font: { size: 10, weight: '600' },
-        formatter: v => v >= 1000 ? (v / 1000).toFixed(1) + 'K' : v } },
+        formatter: v => v > 0 ? (v >= 1000 ? (v / 1000).toFixed(1) + 'K' : v) : '' } },
     { type: 'line', label: pctLabel, yAxisID: 'yPct', data: pctValues, borderColor: COLOR.navyLine,
       backgroundColor: 'rgba(22,50,79,0.08)', borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff',
       pointBorderColor: COLOR.navyLine, pointBorderWidth: 2, tension: 0.3, fill: false, order: 1,
       datalabels: { display: showLabels, align: 'top', offset: 8, color: COLOR.navyLine, font: { size: 11, weight: '700' },
-        formatter: v => v.toFixed(1) + '%' } },
+        formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
   ];
   if (extraLineDatasets) datasets.push(...extraLineDatasets);
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 22 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'top', align: 'start', reverse: false,
           labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
@@ -133,7 +137,7 @@ function makeNestedBarChart(canvasId, labels, breachValues, breachLabel, bddValu
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 22 } }, interaction: { mode: 'index', intersect: false },
       plugins: { legend: { display: true, position: 'top', align: 'start', reverse: true,
         labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } } },
       scales: {
@@ -154,18 +158,18 @@ function makeDualMetricCombo(canvasId, labels, barValues, barLabel, lineValues, 
   const datasets = [
     { type: 'bar', label: barLabel, data: barValues, backgroundColor: COLOR.bar, borderColor: COLOR.barBorder,
       borderWidth: 1, borderRadius: 4, order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
-      datalabels: { display: showLabels, anchor: 'end', align: 'top', color: '#3E7CA6', font: { size: 10, weight: '600' }, formatter: v => v.toFixed(1) + '%' } },
+      datalabels: { display: showLabels, anchor: 'end', align: 'top', color: '#3E7CA6', font: { size: 10, weight: '600' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
     { type: 'line', label: lineLabel, data: lineValues, borderColor: COLOR.navyLine, backgroundColor: 'rgba(22,50,79,0.08)',
       borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.navyLine, pointBorderWidth: 2,
       tension: 0.3, fill: false, order: 1,
-      datalabels: { display: showLabels, align: 'top', offset: 8, color: COLOR.navyLine, font: { size: 11, weight: '700' }, formatter: v => v.toFixed(1) + '%' } },
+      datalabels: { display: showLabels, align: 'top', offset: 8, color: COLOR.navyLine, font: { size: 11, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
   ];
   const baseline = baselineLineDataset(baselineValue, labels.length);
   if (baseline) datasets.push(baseline);
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 22 } }, interaction: { mode: 'index', intersect: false },
       plugins: { legend: { display: true, position: 'top', align: 'start', reverse: false,
         labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } } },
       scales: {
@@ -189,14 +193,14 @@ function makeDualLineChart(canvasId, labels, series1, label1, series2, label2, y
       { label: label1, data: series1, borderColor: COLOR.singleLine, backgroundColor: 'transparent',
         borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.singleLine, pointBorderWidth: 2,
         tension: 0.3, fill: false,
-        datalabels: { display: showLabels, align: 'top', offset: 6, color: COLOR.singleLine, font: { size: 10, weight: '700' }, formatter: v => v.toFixed(1) + '%' } },
+        datalabels: { display: showLabels, align: 'top', offset: 6, color: COLOR.singleLine, font: { size: 10, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
       { label: label2, data: series2, borderColor: COLOR.secondLine, backgroundColor: 'transparent',
         borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.secondLine, pointBorderWidth: 2,
         tension: 0.3, fill: false,
-        datalabels: { display: showLabels, align: 'bottom', offset: 6, color: COLOR.secondLine, font: { size: 10, weight: '700' }, formatter: v => v.toFixed(1) + '%' } },
+        datalabels: { display: showLabels, align: 'bottom', offset: 6, color: COLOR.secondLine, font: { size: 10, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
     ]},
     options: {
-      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 22 } }, interaction: { mode: 'index', intersect: false },
       plugins: { legend: { display: true, position: 'top', align: 'start',
         labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } } },
       scales: {
@@ -221,7 +225,7 @@ function makeSingleLineChart(canvasId, labels, values, label, yLabel) {
       datalabels: { display: showLabels, align: 'top', offset: 6, color: COLOR.singleLine, font: { size: 10, weight: '700' } },
     }]},
     options: {
-      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 22 } }, interaction: { mode: 'index', intersect: false },
       plugins: { legend: { display: true, position: 'top', align: 'start',
         labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } } },
       scales: {
@@ -280,9 +284,9 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
   makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %', null,
     items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`]);
 
-  makeSingleLineChart('chartTatOverall', labels, series.map(r => r.overallTat), 'Overall TAT (min)', 'Minutes');
-  makeSingleLineChart('chartTatSqMdq', labels, series.map(r => r.sqToMdq), 'SQ\u2192MDQ (min)', 'Minutes');
-  makeSingleLineChart('chartTatMdqDel', labels, series.map(r => r.mdqToDel), 'MDQ\u2192Del (min)', 'Minutes');
+  makeSingleLineChart('chartTatOverall', labels, series.map(r => r.overallTat), 'Overall TAT (hrs)', 'Hours');
+  makeSingleLineChart('chartTatSqMdq', labels, series.map(r => r.sqToMdq), 'SQ\u2192MDQ (hrs)', 'Hours');
+  makeSingleLineChart('chartTatMdqDel', labels, series.map(r => r.mdqToDel), 'MDQ\u2192Del (hrs)', 'Hours');
 }
 
 function renderQcCharts(cityMeta, rawSeries, period) {
@@ -446,21 +450,22 @@ function coldChainHTML(coldChain) {
 // ======================= STORE LIST (QC city page) =======================
 // Lightweight inline SVG sparkline — no Chart.js instance per row, just a
 // plain polyline. Cheap enough to render dozens of these in a store list.
-function sparklineSVG(trend, width, height) {
-  width = width || 90; height = height || 28;
-  if (!trend || trend.length < 2) return `<span style="color:var(--text-muted);font-size:11px;">—</span>`;
-  const min = Math.min(...trend), max = Math.max(...trend);
-  const range = (max - min) || 1;
-  const step = width / (trend.length - 1);
-  const points = trend.map((v, i) => `${(i * step).toFixed(1)},${(height - ((v - min) / range) * height).toFixed(1)}`).join(' ');
-  const trendUp = trend[trend.length - 1] >= trend[0];
-  const color = trendUp ? '#4FB3E8' : '#E74C3C';
-  const lastX = ((trend.length - 1) * step).toFixed(1);
-  const lastY = (height - ((trend[trend.length - 1] - min) / range) * height).toFixed(1);
-  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="display:block;">
-    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="${lastX}" cy="${lastY}" r="2.5" fill="${color}"/>
-  </svg>`;
+// Text-based trend indicator (replaces the sparkline) — compares the average
+// of the first half of the trend window to the second half, so one noisy day
+// doesn't flip the verdict. Rising order volume = "Improving" here (more
+// store activity), falling = "Worsening" — flip this if that's backwards for
+// how volume trend should read.
+function trendDirectionHTML(trend) {
+  if (!trend || trend.length < 2) return `<span style="color:var(--text-muted);font-size:12px;">—</span>`;
+  const mid = Math.floor(trend.length / 2);
+  const firstHalf = trend.slice(0, mid || 1);
+  const secondHalf = trend.slice(mid || 1);
+  const avg = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+  const a = avg(firstHalf), b = avg(secondHalf);
+  const delta = a ? (b - a) / a : 0;
+  if (Math.abs(delta) < 0.03) return `<span style="color:var(--text-muted);font-size:12px;font-weight:700;">→ Stable</span>`;
+  if (delta > 0) return `<span style="color:var(--green);font-size:12px;font-weight:700;">↑ Improving</span>`;
+  return `<span style="color:var(--red);font-size:12px;font-weight:700;">↓ Worsening</span>`;
 }
 
 function storeListHTML(storesPayload) {
@@ -468,7 +473,7 @@ function storeListHTML(storesPayload) {
   const rows = storesPayload.stores.map(s => `
     <div class="store-row" onclick="window.location.href='store.html?store=${encodeURIComponent(s.storeCode)}'">
       <span class="store-code">${s.storeCode}</span>
-      <span>${sparklineSVG(s.trend)}</span>
+      <span>${trendDirectionHTML(s.trend)}</span>
       <span>${s.totalOrders.toLocaleString()}</span>
       <span>${(s.dmSharePct*100).toFixed(1)}%</span>
       <span>${(s.tpSharePct*100).toFixed(1)}%</span>
