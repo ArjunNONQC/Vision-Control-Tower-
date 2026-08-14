@@ -12,6 +12,7 @@ const COLOR = {
 
 if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
   Chart.register(ChartDataLabels);
+  Chart.defaults.animation.duration = 250; // snappier rendering, was default 1000ms
 }
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -75,7 +76,7 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
   const showLabels = labels.length <= 10;
   const datasets = [
     { type: 'bar', label: 'Orders', yAxisID: 'yOrders', data: orders, backgroundColor: COLOR.bar,
-      borderColor: COLOR.barBorder, borderWidth: 1, borderRadius: 4, order: 2,
+      borderColor: COLOR.barBorder, borderWidth: 1, borderRadius: 4, order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
       datalabels: { display: showLabels, anchor: 'end', align: 'top', color: '#3E7CA6', font: { size: 10, weight: '600' },
         formatter: v => v >= 1000 ? (v / 1000).toFixed(1) + 'K' : v } },
     { type: 'line', label: pctLabel, yAxisID: 'yPct', data: pctValues, borderColor: COLOR.navyLine,
@@ -105,6 +106,40 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
   });
 }
 
+// Two % bars sharing one category, layered (not side-by-side): outer bar wider/
+// full-width (Breach%), inner bar narrower and lighter-shaded, drawn on top,
+// centered inside the outer bar's footprint (BBD%). Uses grouped:false so
+// Chart.js doesn't offset them side-by-side like a normal multi-series bar chart.
+function makeNestedBarChart(canvasId, labels, outerValues, outerLabel, innerValues, innerLabel, baselineValue) {
+  if (charts[canvasId]) charts[canvasId].destroy();
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const showLabels = labels.length <= 10;
+  const datasets = [
+    { type: 'bar', label: outerLabel, data: outerValues, backgroundColor: COLOR.navyLine,
+      borderRadius: 3, order: 2, grouped: false, categoryPercentage: 0.6, barPercentage: 0.85,
+      datalabels: { display: showLabels, anchor: 'end', align: 'top', color: COLOR.navyLine, font: { size: 11, weight: '700' }, formatter: v => v.toFixed(1) + '%' } },
+    { type: 'bar', label: innerLabel, data: innerValues, backgroundColor: 'rgba(79,179,232,0.75)',
+      borderRadius: 3, order: 1, grouped: false, categoryPercentage: 0.6, barPercentage: 0.42,
+      datalabels: { display: showLabels, anchor: 'center', align: 'center', color: '#0B2138', font: { size: 10, weight: '700' }, formatter: v => v.toFixed(1) + '%' } },
+  ];
+  const baseline = baselineLineDataset(baselineValue, labels.length);
+  if (baseline) { baseline.order = 0; datasets.push(baseline); }
+  charts[canvasId] = new Chart(canvas.getContext('2d'), {
+    type: 'bar', data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: true, position: 'top', align: 'start', reverse: false,
+        labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } } },
+      scales: {
+        y: { position: 'left', beginAtZero: true, title: { display: true, text: '%', font: { size: 10 } },
+          ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+      },
+    },
+  });
+}
+
 // Two % metrics, one bar one line, sharing a single % axis (e.g. LM% bar + Long Tail% line)
 function makeDualMetricCombo(canvasId, labels, barValues, barLabel, lineValues, lineLabel, baselineValue) {
   if (charts[canvasId]) charts[canvasId].destroy();
@@ -113,7 +148,7 @@ function makeDualMetricCombo(canvasId, labels, barValues, barLabel, lineValues, 
   const showLabels = labels.length <= 10;
   const datasets = [
     { type: 'bar', label: barLabel, data: barValues, backgroundColor: COLOR.bar, borderColor: COLOR.barBorder,
-      borderWidth: 1, borderRadius: 4, order: 2,
+      borderWidth: 1, borderRadius: 4, order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
       datalabels: { display: showLabels, anchor: 'end', align: 'top', color: '#3E7CA6', font: { size: 10, weight: '600' }, formatter: v => v.toFixed(1) + '%' } },
     { type: 'line', label: lineLabel, data: lineValues, borderColor: COLOR.navyLine, backgroundColor: 'rgba(22,50,79,0.08)',
       borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.navyLine, pointBorderWidth: 2,
@@ -195,12 +230,10 @@ function makeSingleLineChart(canvasId, labels, values, label, yLabel) {
 // ======================= CARD LAYOUTS PER SERVICE =======================
 function nonQcChartCardsHTML(cityMeta) {
   return `
-    <div class="chart-card"><h3>Breach % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreach"></canvas></div></div>
+    <div class="chart-card"><h3>Breach % + BBD % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3>Long Tail % (LM Induced) ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
-    <div class="chart-card"><h3>BDD %</h3><div class="chart-canvas-wrap"><canvas id="chartBdd"></canvas></div></div>
     <div class="chart-card"><h3>Cancellation %</h3><div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div></div>
-    <div class="chart-card"><h3>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
-    <div class="chart-card"></div>
+    <div class="chart-card span-2"><h3>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
     <div class="section-divider">Queue-Level TAT in Hrs (P80)</div>
     <div class="chart-card"><h3>Overall TAT</h3><div class="chart-canvas-wrap"><canvas id="chartTatOverall"></canvas></div></div>
     <div class="chart-card"><h3>SQ &rarr; MDQ</h3><div class="chart-canvas-wrap"><canvas id="chartTatSqMdq"></canvas></div></div>
@@ -229,12 +262,12 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
   const labels = series.map(r => period === 'WoW' ? fmtWeekLabel(r.date) : fmtDayLabel(r.date));
   const orders = series.map(r => r.orders);
 
-  makeComboChart('chartBreach', labels, orders, series.map(r => round1_(r.breachPct * 100)), 'Breach %',
-    [baselineLineDataset(cityMeta.overallBreachBaseline, series.length)].filter(Boolean),
-    items => [`Breach orders: ${series[items[0].dataIndex].breachOrders ?? '\u2014'} of ${series[items[0].dataIndex].orders ?? '\u2014'}`]);
+  makeNestedBarChart('chartBreachBdd', labels,
+    series.map(r => round1_(r.breachPct * 100)), 'Breach %',
+    series.map(r => round1_(r.bddPct * 100)), 'BBD %',
+    cityMeta.overallBreachBaseline);
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
     [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean));
-  makeComboChart('chartBdd', labels, orders, series.map(r => round1_(r.bddPct * 100)), 'BDD %', null);
   makeComboChart('chartCancel', labels, orders, series.map(r => round1_(r.cancellationPct * 100)), 'Cancellation %', null);
   makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %', null,
     items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`]);
@@ -309,6 +342,67 @@ function ageingHTML(ageing, label) {
     </div>`;
 }
 
+// Fixed/sticky Pan-India summary bar for the home page — a prominent header
+// strip (like a KPI bar): total orders, breach%, LT%, and the ageing breakdown,
+// all pulled straight from the dump sheets' pan-India aggregate.
+function panIndiaAgeingBarHTML(ageing, service, panIndia) {
+  const hasAgeing = ageing && ageing.total;
+  const hasMetrics = panIndia && panIndia.orders != null;
+  if (!hasAgeing && !hasMetrics) {
+    return `<div class="pan-india-bar"><div class="pan-india-label">PAN INDIA · ${service}</div><div class="pan-india-empty">No data yet</div></div>`;
+  }
+  const pct = n => (hasAgeing && ageing.total) ? ((n / ageing.total) * 100).toFixed(1) + '%' : '0%';
+  const buckets = hasAgeing ? [
+    ['D-1', ageing.d1], ['D-2', ageing.d2], ['D-3', ageing.d3],
+    ['D-4 & D-5', ageing.d4 + ageing.d5], ['>5 days', ageing.gt5],
+  ] : [];
+  return `
+    <div class="pan-india-bar">
+      <div class="pan-india-total">
+        <div class="pan-india-label">PAN INDIA · ${service}</div>
+        <div class="pan-india-value">${hasMetrics ? panIndia.orders.toLocaleString() : '—'}</div>
+        <div class="pan-india-sub-label">Total Orders</div>
+      </div>
+      ${hasMetrics ? `
+      <div class="pan-india-metric">
+        <div class="pan-india-metric-val">${(panIndia.breachPct*100).toFixed(1)}%</div>
+        <div class="pan-india-bucket-label">Breach %</div>
+      </div>
+      <div class="pan-india-metric">
+        <div class="pan-india-metric-val">${(panIndia.ltPct*100).toFixed(1)}%</div>
+        <div class="pan-india-bucket-label">Long Tail %</div>
+      </div>` : ''}
+      ${hasAgeing ? `
+      <div class="pan-india-divider"></div>
+      <div class="pan-india-total">
+        <div class="pan-india-label">Ageing (D-1)</div>
+        <div class="pan-india-value" style="font-size:22px;">${ageing.total.toLocaleString()}</div>
+      </div>
+      <div class="pan-india-buckets">
+        ${buckets.map(([label, val]) => `
+          <div class="pan-india-bucket">
+            <div class="pan-india-bucket-val">${val.toLocaleString()}</div>
+            <div class="pan-india-bucket-pct">${pct(val)}</div>
+            <div class="pan-india-bucket-label">${label}</div>
+          </div>`).join('')}
+      </div>` : ''}
+    </div>`;
+}
+
+// Shown once if the backend couldn't find an expected column by name in the
+// sheet — this is the exact class of bug that caused silent 0% readings before
+// (positional parsing quietly reading the wrong column after a sheet edit).
+function schemaWarningHTML(schemaWarnings) {
+  if (!schemaWarnings) return '';
+  const nq = schemaWarnings.dumpNonQcMissingColumns || [];
+  const qc = schemaWarnings.dumpQcMissingColumns || [];
+  if (!nq.length && !qc.length) return '';
+  const parts = [];
+  if (nq.length) parts.push(`Dump NONQC: couldn't find column(s) for ${nq.join(', ')}`);
+  if (qc.length) parts.push(`Dump QC: couldn't find column(s) for ${qc.join(', ')}`);
+  return `<div class="schema-warning">⚠ Sheet column mismatch — ${parts.join(' · ')}. Those fields are reading as 0 until the header names match.</div>`;
+}
+
 function coldChainHTML(coldChain) {
   if (!coldChain) return '';
   const pct = v => (v * 100).toFixed(1) + '%';
@@ -354,27 +448,33 @@ function storeListHTML(storesPayload) {
 // pattern of rendering from already-held state instead of blocking on network.
 // No usable cache at all: falls back to a normal blocking fetch (with retries).
 async function cachedFetchJSON(url, opts) {
-  if (typeof opts === 'number') opts = { ttlMs: opts }; // back-compat with old (url, ttlMs) callers
+  if (typeof opts === 'number') opts = { ttlMs: opts };
   opts = opts || {};
   const ttlMs = opts.ttlMs || 5 * 60 * 1000;
-  const staleMs = opts.staleMs || 24 * 60 * 60 * 1000; // still shown instantly while revalidating
+  const staleMs = opts.staleMs || 24 * 60 * 60 * 1000;
   const key = 'visioncache:' + url;
+
+  if (opts.force) {
+    // Explicit "refresh" click: skip all caching, ask the backend to bypass its
+    // own cache too (refresh=1), and overwrite whatever was stored.
+    const liveUrl = url + (url.includes('?') ? '&' : '?') + 'refresh=1';
+    return fetchAndCache_(liveUrl, key);
+  }
 
   let cached = null;
   try { cached = JSON.parse(localStorage.getItem(key)); } catch (e) { /* ignore corrupt entry */ }
 
   const age = cached ? Date.now() - cached.ts : Infinity;
-  if (cached && age < ttlMs) return cached.data; // fresh — no network needed at all
+  if (cached && age < ttlMs) return cached.data;
 
   if (cached && age < staleMs) {
-    // Stale but usable: hand back what we have right now, refresh quietly behind it
     fetchAndCache_(url, key).then(fresh => {
       if (opts.onRevalidate) opts.onRevalidate(fresh);
-    }).catch(() => { /* background revalidation failure is non-fatal — stale data stays on screen */ });
+    }).catch(() => {});
     return cached.data;
   }
 
-  return fetchAndCache_(url, key); // nothing usable cached — must block on a real fetch
+  return fetchAndCache_(url, key);
 }
 
 async function fetchAndCache_(url, key) {
@@ -394,14 +494,14 @@ async function fetchAndCache_(url, key) {
   throw lastErr;
 }
 
-async function fetchCityData(city, service, onRevalidate) {
-  return cachedFetchJSON(`${WEBAPP_URL}?action=city&city=${encodeURIComponent(city)}&service=${encodeURIComponent(service)}`, { onRevalidate });
+async function fetchCityData(city, service, onRevalidate, force) {
+  return cachedFetchJSON(`${WEBAPP_URL}?action=city&city=${encodeURIComponent(city)}&service=${encodeURIComponent(service)}`, { onRevalidate, force });
 }
-async function fetchStoresData(city) {
-  return cachedFetchJSON(`${WEBAPP_URL}?action=stores&city=${encodeURIComponent(city)}`);
+async function fetchStoresData(city, force) {
+  return cachedFetchJSON(`${WEBAPP_URL}?action=stores&city=${encodeURIComponent(city)}`, { force });
 }
-async function fetchStoreData(storeCode, onRevalidate) {
-  return cachedFetchJSON(`${WEBAPP_URL}?action=store&storeCode=${encodeURIComponent(storeCode)}`, { onRevalidate });
+async function fetchStoreData(storeCode, onRevalidate, force) {
+  return cachedFetchJSON(`${WEBAPP_URL}?action=store&storeCode=${encodeURIComponent(storeCode)}`, { onRevalidate, force });
 }
 
 // Runs a growing list of async tasks with a concurrency cap. Tasks are allowed
@@ -421,23 +521,27 @@ async function runWithConcurrency_(tasks, limit) {
 // Silently warms the browser cache for every city (and every QC store) right
 // after the home page renders, so clicking into any city or store later is
 // served instantly from sessionStorage instead of hitting the network.
+// QC cities are queued FIRST — they're the slower ones to compute (store-level
+// rollup), so they get the head start on warming before you're likely to click one.
 async function prefetchAllCitiesAndStores() {
   try {
     const meta = await cachedFetchJSON(`${WEBAPP_URL}?action=meta`, 10 * 60 * 1000);
     const tasks = [];
-    Object.entries(meta.citiesByService || {}).forEach(([service, cities]) => {
-      cities.forEach(city => {
-        tasks.push(() => fetchCityData(city, service));
-        if (service === 'QC') {
-          tasks.push(async () => {
-            const sd = await fetchStoresData(city);
-            if (sd && sd.stores) {
-              sd.stores.forEach(s => tasks.push(() => fetchStoreData(s.storeCode)));
-            }
-          });
+    const byService = meta.citiesByService || {};
+
+    (byService['QC'] || []).forEach(city => {
+      tasks.push(() => fetchCityData(city, 'QC'));
+      tasks.push(async () => {
+        const sd = await fetchStoresData(city);
+        if (sd && sd.stores) {
+          sd.stores.forEach(s => tasks.push(() => fetchStoreData(s.storeCode)));
         }
       });
     });
+    (byService['Non-QC Inhouse'] || []).forEach(city => {
+      tasks.push(() => fetchCityData(city, 'Non-QC Inhouse'));
+    });
+
     await runWithConcurrency_(tasks, 4); // cap concurrent requests so we don't hammer the Apps Script quota
   } catch (e) { /* background warming is best-effort — a failure here shouldn't affect the visible page */ }
 }
