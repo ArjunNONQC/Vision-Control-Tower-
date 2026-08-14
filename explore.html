@@ -4,7 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Vision — Explore All Cities</title>
-<link rel="stylesheet" href="style.css?v=4" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23FF6F61'/%3E%3Cstop offset='100%25' stop-color='%23486AAE'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='32' cy='32' r='32' fill='url(%23g)'/%3E%3Cpath d='M10 34 L20 34 L24 24 L30 44 L36 20 L40 34 L54 34' stroke='white' stroke-width='4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="style.css?v=7" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -16,6 +17,7 @@
     <h1>Explore — All Cities</h1>
   </div>
   <div class="controls">
+    <button id="refreshBtn" class="btn-icon-refresh" title="Fetch live data from sheet" onclick="doRefresh()">⟳</button>
     <select id="serviceSelect" class="control-select">
       <option value="Non-QC Inhouse">Non-QC</option>
       <option value="QC">QC</option>
@@ -31,13 +33,14 @@
 </div>
 
 <div class="container">
+  <div id="diagBanner"></div>
   <div id="scorecardHolder"></div>
   <div id="chartGrid" class="chart-grid"><div class="loading">Pick a city above to see its metrics.</div></div>
   <div id="storeListHolder"></div>
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=6"></script>
+<script src="citycharts.js?v=10"></script>
 <script>
 let period = 'DoD';
 let service = 'Non-QC Inhouse';
@@ -74,7 +77,7 @@ function renderForService() {
   else renderNonQcCharts(cityMeta, rawSeries, period);
 }
 
-async function loadSelectedCity() {
+async function loadSelectedCity(force) {
   const city = citySelect.value;
   if (!city || city === 'No cities found') {
     document.getElementById('chartGrid').innerHTML = '<div class="empty-state">No data available for this service yet.</div>';
@@ -85,10 +88,10 @@ async function loadSelectedCity() {
   document.getElementById('chartGrid').innerHTML = '<div class="loading">Loading…</div>';
   document.getElementById('storeListHolder').innerHTML = '';
   try {
-    const data = await fetchCityData(city, service, renderExploreData);
+    const data = await fetchCityData(city, service, renderExploreData, force);
     renderExploreData(data);
     if (service === 'QC') {
-      fetchStoresData(city).then(sd => {
+      fetchStoresData(city, force).then(sd => {
         document.getElementById('storeListHolder').innerHTML = storeListHTML(sd);
       }).catch(() => {});
     }
@@ -97,9 +100,18 @@ async function loadSelectedCity() {
   }
 }
 
+async function doRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  btn.disabled = true;
+  try { await loadSelectedCity(true); }
+  finally { btn.classList.remove('spinning'); btn.disabled = false; }
+}
+
 function renderExploreData(data) {
   cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
   rawSeries = data.series;
+  document.getElementById('diagBanner').innerHTML = schemaWarningHTML(data.schemaWarnings);
   document.getElementById('scorecardHolder').innerHTML =
     statPanelsHTML(data.orderSummary, data.coldChain, data.ageing, data.ageing ? 'D-1, latest' : null);
   document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
