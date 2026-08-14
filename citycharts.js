@@ -398,7 +398,12 @@ function panIndiaAgeingBarHTML(ageing, service, panIndia) {
       <div class="pan-india-metric">
         <div class="pan-india-metric-val">${(panIndia.ltPct*100).toFixed(1)}%</div>
         <div class="pan-india-bucket-label">⏱ Long Tail %</div>
-      </div>` : ''}
+      </div>
+      ${panIndia.retryPct != null ? `
+      <div class="pan-india-metric">
+        <div class="pan-india-metric-val">${(panIndia.retryPct*100).toFixed(1)}%</div>
+        <div class="pan-india-bucket-label">🔁 Retry Rate</div>
+      </div>` : ''}` : ''}
       ${hasAgeing ? `
       <div class="pan-india-divider"></div>
       <div class="pan-india-total">
