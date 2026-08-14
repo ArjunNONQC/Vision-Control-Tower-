@@ -60,10 +60,10 @@ function toWeekly(series, pctFields, avgFields) {
   });
 }
 
-function baselineLineDataset(value, len) {
+function baselineLineDataset(value, len, yAxisID) {
   if (value == null) return null;
   return {
-    type: 'line', label: 'Baseline', yAxisID: 'yPct',
+    type: 'line', label: 'Baseline', yAxisID: yAxisID || 'yPct',
     data: Array(len).fill(round1_(value * 100)),
     borderColor: COLOR.baseline, borderDash: [6, 4], pointRadius: 0, borderWidth: 2, fill: false,
     datalabels: { display: false },
@@ -122,13 +122,13 @@ function makeNestedBarChart(canvasId, labels, breachValues, breachLabel, bddValu
   const showLabels = labels.length <= 10;
   const datasets = [
     { type: 'bar', label: bddLabel, data: bddValues, backgroundColor: 'rgba(79,179,232,0.85)',
-      stack: 'breachStack', order: 2,
+      stack: 'breachStack', order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
       datalabels: { display: showLabels, anchor: 'center', align: 'center', color: '#0B2138', font: { size: 10, weight: '700' }, formatter: v => v > 0.05 ? v.toFixed(1) + '%' : '' } },
     { type: 'bar', label: breachLabel, data: breachValues, backgroundColor: COLOR.navyLine,
-      stack: 'breachStack', order: 1,
+      stack: 'breachStack', order: 1, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
       datalabels: { display: showLabels, anchor: 'center', align: 'center', color: '#fff', font: { size: 10, weight: '700' }, formatter: v => v > 0.05 ? v.toFixed(1) + '%' : '' } },
   ];
-  const baseline = baselineLineDataset(baselineValue, labels.length);
+  const baseline = baselineLineDataset(baselineValue, labels.length, 'y');
   if (baseline) { baseline.order = 0; datasets.push(baseline); }
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
@@ -444,11 +444,31 @@ function coldChainHTML(coldChain) {
 }
 
 // ======================= STORE LIST (QC city page) =======================
+// Lightweight inline SVG sparkline — no Chart.js instance per row, just a
+// plain polyline. Cheap enough to render dozens of these in a store list.
+function sparklineSVG(trend, width, height) {
+  width = width || 90; height = height || 28;
+  if (!trend || trend.length < 2) return `<span style="color:var(--text-muted);font-size:11px;">—</span>`;
+  const min = Math.min(...trend), max = Math.max(...trend);
+  const range = (max - min) || 1;
+  const step = width / (trend.length - 1);
+  const points = trend.map((v, i) => `${(i * step).toFixed(1)},${(height - ((v - min) / range) * height).toFixed(1)}`).join(' ');
+  const trendUp = trend[trend.length - 1] >= trend[0];
+  const color = trendUp ? '#4FB3E8' : '#E74C3C';
+  const lastX = ((trend.length - 1) * step).toFixed(1);
+  const lastY = (height - ((trend[trend.length - 1] - min) / range) * height).toFixed(1);
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="display:block;">
+    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${lastX}" cy="${lastY}" r="2.5" fill="${color}"/>
+  </svg>`;
+}
+
 function storeListHTML(storesPayload) {
   if (!storesPayload || storesPayload.error || !storesPayload.stores.length) return '';
   const rows = storesPayload.stores.map(s => `
     <div class="store-row" onclick="window.location.href='store.html?store=${encodeURIComponent(s.storeCode)}'">
       <span class="store-code">${s.storeCode}</span>
+      <span>${sparklineSVG(s.trend)}</span>
       <span>${s.totalOrders.toLocaleString()}</span>
       <span>${(s.dmSharePct*100).toFixed(1)}%</span>
       <span>${(s.tpSharePct*100).toFixed(1)}%</span>
@@ -457,7 +477,7 @@ function storeListHTML(storesPayload) {
     <div class="section-label">Stores in ${storesPayload.city} <span style="font-weight:500;text-transform:none;">(as of ${fmtDayLabel(storesPayload.asOf)})</span></div>
     <div class="store-list">
       <div class="store-row store-header">
-        <span>Store</span><span>Total Orders</span><span>DM Share</span><span>3P Share</span>
+        <span>Store</span><span>Trend</span><span>Total Orders</span><span>DM Share</span><span>3P Share</span>
       </div>
       ${rows}
     </div>`;
