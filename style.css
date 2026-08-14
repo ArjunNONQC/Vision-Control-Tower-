@@ -45,6 +45,17 @@ body {
   font-weight: 700;
   margin: 0;
   letter-spacing: 0.2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vision-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: block;
+  flex-shrink: 0;
 }
 
 .topbar .asof {
