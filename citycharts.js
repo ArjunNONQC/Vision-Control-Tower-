@@ -54,6 +54,8 @@ function toWeekly(series, pctFields, avgFields) {
     });
     out.ofdOrders = rows.reduce((s, r) => s + (r.ofdOrders || 0), 0);
     out.retries = rows.reduce((s, r) => s + (r.retries || 0), 0);
+    out.sddOrders = rows.reduce((s, r) => s + (r.sddOrders || 0), 0);
+    out.sddFasterOrders = rows.reduce((s, r) => s + (r.sddFasterOrders || 0), 0);
     return out;
   });
 }
@@ -110,18 +112,21 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
 // full-width (Breach%), inner bar narrower and lighter-shaded, drawn on top,
 // centered inside the outer bar's footprint (BBD%). Uses grouped:false so
 // Chart.js doesn't offset them side-by-side like a normal multi-series bar chart.
-function makeNestedBarChart(canvasId, labels, outerValues, outerLabel, innerValues, innerLabel, baselineValue) {
+// TRUE stacked bar (matches the "Long Tail Bifurcation %" reference style):
+// BBD% forms the base segment, Breach% stacks on top of it, each segment
+// labeled with its own value directly inside the bar.
+function makeNestedBarChart(canvasId, labels, breachValues, breachLabel, bddValues, bddLabel, baselineValue) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
   const showLabels = labels.length <= 10;
   const datasets = [
-    { type: 'bar', label: outerLabel, data: outerValues, backgroundColor: COLOR.navyLine,
-      borderRadius: 3, order: 2, grouped: false, categoryPercentage: 0.6, barPercentage: 0.85,
-      datalabels: { display: showLabels, anchor: 'end', align: 'top', color: COLOR.navyLine, font: { size: 11, weight: '700' }, formatter: v => v.toFixed(1) + '%' } },
-    { type: 'bar', label: innerLabel, data: innerValues, backgroundColor: 'rgba(79,179,232,0.75)',
-      borderRadius: 3, order: 1, grouped: false, categoryPercentage: 0.6, barPercentage: 0.42,
-      datalabels: { display: showLabels, anchor: 'center', align: 'center', color: '#0B2138', font: { size: 10, weight: '700' }, formatter: v => v.toFixed(1) + '%' } },
+    { type: 'bar', label: bddLabel, data: bddValues, backgroundColor: 'rgba(79,179,232,0.85)',
+      stack: 'breachStack', order: 2,
+      datalabels: { display: showLabels, anchor: 'center', align: 'center', color: '#0B2138', font: { size: 10, weight: '700' }, formatter: v => v > 0.05 ? v.toFixed(1) + '%' : '' } },
+    { type: 'bar', label: breachLabel, data: breachValues, backgroundColor: COLOR.navyLine,
+      stack: 'breachStack', order: 1,
+      datalabels: { display: showLabels, anchor: 'center', align: 'center', color: '#fff', font: { size: 10, weight: '700' }, formatter: v => v > 0.05 ? v.toFixed(1) + '%' : '' } },
   ];
   const baseline = baselineLineDataset(baselineValue, labels.length);
   if (baseline) { baseline.order = 0; datasets.push(baseline); }
@@ -129,12 +134,12 @@ function makeNestedBarChart(canvasId, labels, outerValues, outerLabel, innerValu
     type: 'bar', data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: true, position: 'top', align: 'start', reverse: false,
+      plugins: { legend: { display: true, position: 'top', align: 'start', reverse: true,
         labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } } },
       scales: {
-        y: { position: 'left', beginAtZero: true, title: { display: true, text: '%', font: { size: 10 } },
+        y: { stacked: true, position: 'left', beginAtZero: true, title: { display: true, text: '%', font: { size: 10 } },
           ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
-        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        x: { stacked: true, ticks: { font: { size: 10 } }, grid: { display: false } },
       },
     },
   });
@@ -233,6 +238,7 @@ function nonQcChartCardsHTML(cityMeta) {
     <div class="chart-card"><h3>Breach % + BBD % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3>Long Tail % (LM Induced) ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3>Cancellation %</h3><div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div></div>
+    <div class="chart-card"><h3>SDD & Faster %</h3><div class="chart-canvas-wrap"><canvas id="chartSddFaster"></canvas></div></div>
     <div class="chart-card span-2"><h3>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
     <div class="section-divider">Queue-Level TAT in Hrs (P80)</div>
     <div class="chart-card"><h3>Overall TAT</h3><div class="chart-canvas-wrap"><canvas id="chartTatOverall"></canvas></div></div>
@@ -256,7 +262,7 @@ function storeChartCardsHTML() {
 }
 
 function renderNonQcCharts(cityMeta, rawSeries, period) {
-  const pctFields = ['breachPct','ltPct','bddPct','cancellationPct'];
+  const pctFields = ['breachPct','ltPct','bddPct','cancellationPct','sddFasterPct'];
   const avgFields = ['overallTat','sqToMdq','mdqToDel'];
   const series = period === 'WoW' ? toWeekly(rawSeries, pctFields, avgFields) : rawSeries;
   const labels = series.map(r => period === 'WoW' ? fmtWeekLabel(r.date) : fmtDayLabel(r.date));
@@ -269,6 +275,8 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
     [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean));
   makeComboChart('chartCancel', labels, orders, series.map(r => round1_(r.cancellationPct * 100)), 'Cancellation %', null);
+  makeComboChart('chartSddFaster', labels, series.map(r => r.sddOrders ?? 0),
+    series.map(r => r.sddFasterPct != null ? round1_(r.sddFasterPct * 100) : null), 'SDD & Faster %', null);
   makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %', null,
     items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`]);
 
@@ -325,19 +333,33 @@ function statPanelsHTML(orderSummary, coldChain, ageing, ageingLabel) {
     </div>`;
 }
 
+// RAG (Red/Amber/Green) severity by ageing bucket, used everywhere an ageing
+// breakdown is shown: D-1 = green (fresh, expected), D-2 = amber (watch),
+// D-3 and older = red (needs action). Reused by both the per-city ageing
+// panel and the Pan-India header bar so the color language stays consistent.
+function ageingBucketRag_(bucketKey) {
+  if (bucketKey === 'd1') return 'rag-green';
+  if (bucketKey === 'd2') return 'rag-amber';
+  return 'rag-red'; // d3, d4d5, gt5
+}
+
 function ageingHTML(ageing, label) {
   if (!ageing || !ageing.total) return '';
   const pct = n => ageing.total ? ((n / ageing.total) * 100).toFixed(1) + '%' : '0%';
+  const rows = [
+    ['d1', 'D-1', ageing.d1],
+    ['d2', 'D-2', ageing.d2],
+    ['d3', 'D-3', ageing.d3],
+    ['d4d5', 'D-4 &amp; D-5', ageing.d4 + ageing.d5],
+    ['gt5', '&gt;5 days', ageing.gt5],
+  ];
   return `
     <div class="scorecard ageing-scorecard">
       <div class="scorecard-label">Ageing Orders ${label ? `<span class="scorecard-date">(${label})</span>` : ''}</div>
       <div class="scorecard-value">${ageing.total.toLocaleString()}</div>
       <div class="cold-breakdown">
-        <div class="cold-bar-row"><span class="cold-bar-label">D-1</span><div class="cold-bar-track"><div class="cold-bar-fill low" style="width:${pct(ageing.d1)}"></div></div><span class="cold-bar-val">${ageing.d1} (${pct(ageing.d1)})</span></div>
-        <div class="cold-bar-row"><span class="cold-bar-label">D-2</span><div class="cold-bar-track"><div class="cold-bar-fill high" style="width:${pct(ageing.d2)}"></div></div><span class="cold-bar-val">${ageing.d2} (${pct(ageing.d2)})</span></div>
-        <div class="cold-bar-row"><span class="cold-bar-label">D-3</span><div class="cold-bar-track"><div class="cold-bar-fill both" style="width:${pct(ageing.d3)}"></div></div><span class="cold-bar-val">${ageing.d3} (${pct(ageing.d3)})</span></div>
-        <div class="cold-bar-row"><span class="cold-bar-label">D-4 &amp; D-5</span><div class="cold-bar-track"><div class="cold-bar-fill high" style="width:${pct(ageing.d4+ageing.d5)}"></div></div><span class="cold-bar-val">${ageing.d4+ageing.d5} (${pct(ageing.d4+ageing.d5)})</span></div>
-        <div class="cold-bar-row"><span class="cold-bar-label">&gt;5 days</span><div class="cold-bar-track"><div class="cold-bar-fill both" style="width:${pct(ageing.gt5)}"></div></div><span class="cold-bar-val">${ageing.gt5} (${pct(ageing.gt5)})</span></div>
+        ${rows.map(([key, lbl, val]) => `
+        <div class="cold-bar-row"><span class="cold-bar-label">${lbl}</span><div class="cold-bar-track"><div class="cold-bar-fill ${ageingBucketRag_(key)}" style="width:${pct(val)}"></div></div><span class="cold-bar-val">${val} (${pct(val)})</span></div>`).join('')}
       </div>
     </div>`;
 }
@@ -349,28 +371,29 @@ function panIndiaAgeingBarHTML(ageing, service, panIndia) {
   const hasAgeing = ageing && ageing.total;
   const hasMetrics = panIndia && panIndia.orders != null;
   if (!hasAgeing && !hasMetrics) {
-    return `<div class="pan-india-bar"><div class="pan-india-label">PAN INDIA · ${service}</div><div class="pan-india-empty">No data yet</div></div>`;
+    return `<div class="pan-india-bar"><div class="pan-india-icon">🌐</div><div class="pan-india-label">PAN INDIA · ${service}</div><div class="pan-india-empty">No data yet</div></div>`;
   }
   const pct = n => (hasAgeing && ageing.total) ? ((n / ageing.total) * 100).toFixed(1) + '%' : '0%';
   const buckets = hasAgeing ? [
-    ['D-1', ageing.d1], ['D-2', ageing.d2], ['D-3', ageing.d3],
-    ['D-4 & D-5', ageing.d4 + ageing.d5], ['>5 days', ageing.gt5],
+    ['d1', 'D-1', ageing.d1], ['d2', 'D-2', ageing.d2], ['d3', 'D-3', ageing.d3],
+    ['d4d5', 'D-4 & D-5', ageing.d4 + ageing.d5], ['gt5', '>5 days', ageing.gt5],
   ] : [];
   return `
     <div class="pan-india-bar">
+      <div class="pan-india-icon">🌐</div>
       <div class="pan-india-total">
         <div class="pan-india-label">PAN INDIA · ${service}</div>
         <div class="pan-india-value">${hasMetrics ? panIndia.orders.toLocaleString() : '—'}</div>
-        <div class="pan-india-sub-label">Total Orders</div>
+        <div class="pan-india-sub-label">📦 Total Orders</div>
       </div>
       ${hasMetrics ? `
       <div class="pan-india-metric">
         <div class="pan-india-metric-val">${(panIndia.breachPct*100).toFixed(1)}%</div>
-        <div class="pan-india-bucket-label">Breach %</div>
+        <div class="pan-india-bucket-label">⚠ Breach %</div>
       </div>
       <div class="pan-india-metric">
         <div class="pan-india-metric-val">${(panIndia.ltPct*100).toFixed(1)}%</div>
-        <div class="pan-india-bucket-label">Long Tail %</div>
+        <div class="pan-india-bucket-label">⏱ Long Tail %</div>
       </div>` : ''}
       ${hasAgeing ? `
       <div class="pan-india-divider"></div>
@@ -379,9 +402,9 @@ function panIndiaAgeingBarHTML(ageing, service, panIndia) {
         <div class="pan-india-value" style="font-size:22px;">${ageing.total.toLocaleString()}</div>
       </div>
       <div class="pan-india-buckets">
-        ${buckets.map(([label, val]) => `
+        ${buckets.map(([key, label, val]) => `
           <div class="pan-india-bucket">
-            <div class="pan-india-bucket-val">${val.toLocaleString()}</div>
+            <div class="pan-india-bucket-val ${ageingBucketRag_(key)}-text">${val.toLocaleString()}</div>
             <div class="pan-india-bucket-pct">${pct(val)}</div>
             <div class="pan-india-bucket-label">${label}</div>
           </div>`).join('')}
@@ -396,10 +419,12 @@ function schemaWarningHTML(schemaWarnings) {
   if (!schemaWarnings) return '';
   const nq = schemaWarnings.dumpNonQcMissingColumns || [];
   const qc = schemaWarnings.dumpQcMissingColumns || [];
-  if (!nq.length && !qc.length) return '';
+  const sdd = schemaWarnings.sddFasterMissingColumns || [];
+  if (!nq.length && !qc.length && !sdd.length) return '';
   const parts = [];
   if (nq.length) parts.push(`Dump NONQC: couldn't find column(s) for ${nq.join(', ')}`);
   if (qc.length) parts.push(`Dump QC: couldn't find column(s) for ${qc.join(', ')}`);
+  if (sdd.length) parts.push(`SDD & Faster %: couldn't find column(s) for ${sdd.join(', ')}`);
   return `<div class="schema-warning">⚠ Sheet column mismatch — ${parts.join(' · ')}. Those fields are reading as 0 until the header names match.</div>`;
 }
 
