@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Vision — City Performance Tracker</title>
+<title>Vision — City Tracker</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=12" />
+<link rel="stylesheet" href="style.css?v=13" />
 </head>
 <body>
 
 <div id="lockScreen" class="lock-screen">
   <div class="lock-box">
-    <h2>Vision — City Performance</h2>
+    <h2>Vision — City Tracker</h2>
     <p>Enter password to continue</p>
     <input type="password" id="lockInput" placeholder="Password" autocomplete="off" />
     <button id="lockSubmit" class="nav-btn" style="background:var(--header-blue);border:none;width:100%;padding:10px;">Unlock</button>
@@ -23,11 +23,11 @@
 
 <div class="topbar">
   <div>
-    <h1><img src="vision-icon.svg" alt="" class="vision-icon" />Vision — City Performance</h1>
-    <div class="asof" id="asOfLabel">Loading…</div>
+    <h1><img src="vision-icon.svg" alt="" class="vision-icon" />Vision — City Tracker</h1>
   </div>
   <div class="controls">
     <button id="refreshBtn" class="btn-icon-refresh" title="Fetch live data from sheet" onclick="doRefresh()">⟳</button>
+    <button id="downloadReportBtn" class="nav-btn" onclick="downloadReport()">⬇ Download Report</button>
     <a class="nav-btn" href="explore.html">All Cities →</a>
     <div class="toggle-group" id="serviceToggle">
       <button data-val="Non-QC Inhouse" class="active">Non-QC</button>
@@ -53,7 +53,7 @@
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=16"></script>
+<script src="citycharts.js?v=18"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -130,7 +130,7 @@ function renderBreachCard(c) {
 
   return `
     <div class="city-card ${sevClass}" onclick="goToCity('${c.city}','${c.service}')">
-      <div class="city-name">${c.city}</div>
+      <div class="city-name">${cityIconHTML_(c.city)}${c.city}</div>
       <div class="driven-by">Driven by: ${metricLabel(c.drivenBy)}</div>
       ${rows}
     </div>`;
@@ -161,13 +161,42 @@ async function doRefresh() {
   finally { btn.classList.remove('spinning'); btn.disabled = false; }
 }
 
+async function downloadReport() {
+  const btn = document.getElementById('downloadReportBtn');
+  const originalText = btn.textContent;
+  btn.textContent = 'Generating…';
+  btn.disabled = true;
+  try {
+    const url = `${WEBAPP_URL}?action=generateReport&service=${encodeURIComponent(state.service)}&period=${state.period}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    const byteChars = atob(data.base64);
+    const byteNumbers = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = data.filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (err) {
+    alert("Couldn't generate report: " + err.message);
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+}
+
 function renderHomeData(data) {
   try {
     const diagBanner = document.getElementById('diagBanner');
     diagBanner.innerHTML = schemaWarningHTML(data.schemaWarnings);
     if (data.diagnostic) {
       // asOf came back null — no rows matched this service at all
-      document.getElementById('asOfLabel').textContent = 'No data found';
       diagBanner.innerHTML += `<div class="empty-state" style="background:#FDECEA;border:1px solid #F5C6C0;border-radius:8px;padding:12px 16px;margin-bottom:16px;color:#8B2E22;">
         <strong>No rows matched.</strong> ${data.diagnostic.message}
       </div>`;
@@ -175,9 +204,6 @@ function renderHomeData(data) {
       document.getElementById('trendStrip').innerHTML = '';
       return;
     }
-
-    document.getElementById('asOfLabel').textContent =
-      data.period === 'DoD' ? `As of ${data.asOf}` : `Week ending ${data.asOf}`;
 
     document.getElementById('panIndiaAgeing').innerHTML =
       panIndiaAgeingBarHTML(data.ageing, data.service, data.panIndia);
@@ -194,7 +220,7 @@ function renderHomeData(data) {
       strip.innerHTML = '<div class="empty-state">—</div>';
     } else {
       strip.innerHTML = data.asPerTrend.map(c =>
-        `<div class="trend-chip" onclick="goToCity('${c.city}','${c.service}')">${c.city}</div>`
+        `<div class="trend-chip" onclick="goToCity('${c.city}','${c.service}')">${cityIconHTML_(c.city)}${c.city}</div>`
       ).join('');
     }
 
