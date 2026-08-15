@@ -51,8 +51,8 @@ body {
 }
 
 .vision-icon {
-  width: 30px;
-  height: 30px;
+  width: 45px;
+  height: 45px;
   border-radius: 50%;
   display: block;
   flex-shrink: 0;
@@ -169,8 +169,19 @@ select.control-select {
   font-size: 17px;
   font-weight: 800;
   margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
+.city-icon {
+  width: 21px;
+  height: 21px;
+  flex-shrink: 0;
+  color: var(--header-blue-2);
+}
+
+.trend-chip .city-icon { width: 16px; height: 16px; color: var(--green); }
 .city-card .driven-by {
   font-size: 11px;
   color: var(--text-muted);
@@ -218,6 +229,9 @@ select.control-select {
 }
 
 .trend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: var(--green-bg);
   color: var(--green);
   border: 1px solid #CDEBD8;
@@ -312,6 +326,7 @@ select.control-select {
 .dot-sdd { background: #8E44AD; }
 .dot-retry { background: #D68910; }
 .dot-tat { background: #16A085; }
+.dot-share { background: #2980B9; }
 
 .chart-card .sub {
   font-size: 11.5px;
