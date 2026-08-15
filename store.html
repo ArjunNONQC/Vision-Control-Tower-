@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Vision — Store Detail</title>
-<link rel="icon" type="image/png" href="vision-favicon.png" />
-<link rel="stylesheet" href="style.css?v=11" />
+<link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
+<link rel="stylesheet" href="style.css?v=12" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -15,7 +15,7 @@
   <div>
     <a class="nav-btn" href="index.html">← Vision Home</a>
     <span id="backToCity"></span>
-    <h1><img src="vision-icon.png" alt="" class="vision-icon" /><span id="storeTitle">Loading…</span></h1>
+    <h1><img src="vision-icon.svg" alt="" class="vision-icon" /><span id="storeTitle">Loading…</span></h1>
   </div>
   <div class="controls">
     <button id="refreshBtn" class="btn-icon-refresh" title="Fetch live data from sheet" onclick="doRefresh()">⟳</button>
@@ -31,7 +31,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=15"></script>
+<script src="citycharts.js?v=16"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const STORE_CODE = params.get('store');
