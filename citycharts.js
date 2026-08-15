@@ -424,18 +424,18 @@ function panIndiaAgeingBarHTML(ageing, service, panIndia) {
       <div class="pan-india-metric">
         <div class="pan-india-metric-val">${(panIndia.ltPct*100).toFixed(1)}%</div>
         <div class="pan-india-bucket-label">⏱ Long Tail %</div>
-      </div>
-      ${panIndia.retryPct != null ? `
-      <div class="pan-india-metric">
-        <div class="pan-india-metric-val">${(panIndia.retryPct*100).toFixed(1)}%</div>
-        <div class="pan-india-bucket-label">🔁 Retry Rate</div>
-      </div>` : ''}` : ''}
+      </div>` : ''}
       ${hasAgeing ? `
       <div class="pan-india-divider"></div>
       <div class="pan-india-total">
         <div class="pan-india-label">Ageing &gt; (D-0)</div>
         <div class="pan-india-value" style="font-size:22px;">${ageing.total.toLocaleString()}</div>
       </div>
+      ${panIndia && panIndia.retryPct != null ? `
+      <div class="pan-india-metric">
+        <div class="pan-india-metric-val">${(panIndia.retryPct*100).toFixed(1)}%</div>
+        <div class="pan-india-bucket-label">🔁 Current Retry Rate</div>
+      </div>` : ''}
       <div class="pan-india-buckets">
         ${buckets.map(([key, label, val]) => `
           <div class="pan-india-bucket">
@@ -461,6 +461,45 @@ function schemaWarningHTML(schemaWarnings) {
   if (qc.length) parts.push(`Dump QC: couldn't find column(s) for ${qc.join(', ')}`);
   if (sdd.length) parts.push(`SDD & Faster %: couldn't find column(s) for ${sdd.join(', ')}`);
   return `<div class="schema-warning">⚠ Sheet column mismatch — ${parts.join(' · ')}. Those fields are reading as 0 until the header names match.</div>`;
+}
+
+// City landmark icons — simple flat single-color line icons, one per city,
+// matching a clean/minimal premium style. First-pass set: consistent visual
+// weight across all 23, refined individually later if any doesn't read well.
+// Keys are normalized (uppercase) city names; falls back to a generic city
+// building icon for anything not in this list.
+const CITY_ICON_SVGS = {
+  'BANGALORE': '<path d="M4 21h16M6 21V9l3-2h6l3 2v12M9 21V9M15 21V9M12 9V4"/><circle cx="12" cy="4" r="1.5"/>', // Vidhana Soudha — dome + columns
+  'BHUBANESHWAR': '<path d="M12 2v6M8 21V13a4 4 0 0 1 8 0v8M5 21h14M12 8l-2 2h4l-2-2z"/>', // Lingaraj Temple — tall shikhara tower
+  'CHENNAI': '<path d="M5 21V11l7-8 7 8v10M5 21h14M9 21v-6h6v6"/>', // Kapaleeshwarar — stepped gopuram
+  'DEHRADUN': '<path d="M12 3l3 5H9l3-5zM12 8l4 6h-8l4-6zM6 21v-4M18 21v-4M4 21h16"/>', // Forest Research Institute — pine + building
+  'ERNAKULAM': '<path d="M4 20h4M4 20v-6l4-2M4 12v-3M20 20h-4M20 20v-6l-4-2M20 12v-3M12 20V9M8 9h8"/>', // Chinese fishing nets
+  'FARIDABAD': '<path d="M4 21V9l3-2 3 2v12M11 21V9l3-2 3 2v12M4 21h16M7 5v2M14 5v2"/>', // Raja Nahar Singh Palace — twin domes
+  'GHAZIABAD': '<path d="M6 21V10a6 6 0 0 1 12 0v11M6 21h12M10 21v-5h4v5"/>', // Dasna Gate — archway
+  'GREATER NOIDA': '<path d="M3 17c4-6 14-6 18 0M3 17h18M6 17c1-3 3-3 4 0M14 17c1-3 3-3 4 0"/>', // Buddh Circuit — curved track
+  'GURGAON': '<path d="M4 21V7l4-2 4 2v14M12 21V4l4-2 4 2v17M4 21h16"/>', // Cyber Hub — glass towers
+  'GUWAHATI': '<path d="M12 3c-2 3-2 5 0 6s2 3 0 6M6 21v-6a6 6 0 0 1 12 0v6M4 21h16"/>', // Kamakhya Temple — beehive roof
+  'HYDERABAD': '<path d="M4 21V9M9 21V6M15 21V6M20 21V9M4 21h16M9 6l2-3 2 3M15 6l2-3 2 3"/>', // Charminar — four minarets
+  'JAIPUR': '<path d="M5 21V9h3v3H5m3-3h3v3H8m3-3h3v3h-3m3-3h3v3h-3M5 21h14"/>', // Hawa Mahal — lattice facade
+  'JAMSHEDPUR': '<path d="M12 21V11M8 21v-6M16 21v-6M12 11l-3-3M12 11l3-3M4 21h16"/>', // Jubilee Park — tree + gate
+  'KANPUR': '<path d="M12 3v3M8 21V10a4 4 0 0 1 8 0v11M4 21h16M9 6h6"/>', // JK Temple — dome
+  'KOLKATA': '<path d="M12 2v3M7 21V11a5 5 0 0 1 10 0v10M4 21h16M9 11h6"/>', // Victoria Memorial — grand dome
+  'LUCKNOW': '<path d="M6 21V13a6 6 0 0 1 12 0v8M6 21h12M12 13a3 3 0 0 0 0-6"/>', // Bara Imambara — large dome
+  'MUMBAI': '<path d="M6 21V8c0-3 2.5-5 6-5s6 2 6 5v13M6 21h12M6 14h12"/>', // Gateway of India — arch
+  'DELHI': '<path d="M6 21V9c0-4 2.5-6 6-6s6 2 6 6v12M6 21h12M6 12h12"/>', // India Gate — arch
+  'NEW DELHI': '<path d="M6 21V9c0-4 2.5-6 6-6s6 2 6 6v12M6 21h12M6 12h12"/>',
+  'NOIDA': '<path d="M3 16a9 5 0 0 1 18 0M3 16v3h18v-3M3 16a9 5 0 0 0 18 0"/>', // Noida Stadium — bowl
+  'PANCHKULA': '<path d="M12 21V9M12 9c-2 0-3-1-3-3M12 9c2 0 3-1 3-3M12 6c-1 0-2-1-2-2M12 6c1 0 2-1 2-2M4 21h16"/>', // Cactus Garden
+  'PATNA': '<path d="M12 3c4 0 6 4 6 8s-2 5-6 5-6-1-6-5 2-8 6-8zM12 16v5M8 21h8"/>', // Golghar — beehive granary
+  'PUNE': '<path d="M4 21V13l3-2 3 2v8M11 21V13l3-2 3 2v8M4 21h16M6 8v2M17 8v2"/>', // Shaniwar Wada — fort towers
+  'ROI': '<path d="M12 2a5 5 0 0 1 5 5c0 4-5 9-5 9s-5-5-5-9a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="2"/>', // generic India-pin
+};
+
+function cityIconHTML_(cityName) {
+  const key = (cityName || '').toString().trim().toUpperCase();
+  const path = CITY_ICON_SVGS[key] ||
+    '<path d="M4 21V10l4-2 4 2v11M12 21V6l4-2 4 2v15M4 21h16"/>'; // generic city-building fallback
+  return `<svg class="city-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
 }
 
 function coldChainHTML(coldChain) {
