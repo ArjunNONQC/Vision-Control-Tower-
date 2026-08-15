@@ -74,32 +74,42 @@ function baselineLineDataset(value, len, yAxisID) {
   };
 }
 
+// Shared tooltip look — nothing on the chart itself is ever a static label;
+// every value (the metric, Orders, Baseline, all of it) only appears here,
+// on hover. This is the one thing that can never collide, at any data
+// density, because only a single tooltip is ever rendered at a time.
+const TOOLTIP_STYLE = {
+  backgroundColor: 'rgba(22,50,79,0.96)', titleColor: '#fff', bodyColor: '#E8F0F8',
+  padding: 10, cornerRadius: 8, displayColors: true, boxPadding: 4,
+  titleFont: { size: 12, weight: '700' }, bodyFont: { size: 11.5 },
+};
+
 // Bars = order volume (left axis) . Line = one % metric (right axis)
 function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLineDatasets, tooltipExtra) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
-  const showLabels = labels.length <= 10;
   const datasets = [
     { type: 'bar', label: 'Orders', yAxisID: 'yOrders', data: orders, backgroundColor: COLOR.bar,
       borderColor: COLOR.barBorder, borderWidth: 1, borderRadius: 4, order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
-      datalabels: { display: showLabels, anchor: 'end', align: 'top', color: '#3E7CA6', font: { size: 10, weight: '600' },
-        formatter: v => v > 0 ? (v >= 1000 ? (v / 1000).toFixed(1) + 'K' : v) : '' } },
+      datalabels: { display: false } },
     { type: 'line', label: pctLabel, yAxisID: 'yPct', data: pctValues, borderColor: COLOR.navyLine,
       backgroundColor: 'rgba(22,50,79,0.08)', borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff',
       pointBorderColor: COLOR.navyLine, pointBorderWidth: 2, tension: 0.3, fill: false, order: 1,
-      datalabels: { display: showLabels, align: 'top', offset: 8, color: COLOR.navyLine, font: { size: 11, weight: '700' },
-        formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
+      datalabels: { display: false } },
   ];
   if (extraLineDatasets) datasets.push(...extraLineDatasets);
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 32 } }, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 16 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'top', align: 'start', reverse: false,
           padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
-        tooltip: { callbacks: tooltipExtra ? { afterBody: tooltipExtra } : undefined },
+        tooltip: { ...TOOLTIP_STYLE, callbacks: {
+          label: ctx => ` ${ctx.dataset.label}: ${ctx.dataset.yAxisID === 'yPct' ? ctx.formattedValue + '%' : ctx.formattedValue}`,
+          afterBody: tooltipExtra,
+        } },
       },
       scales: {
         yOrders: { position: 'left', beginAtZero: true, title: { display: true, text: 'Orders', font: { size: 10 } },
@@ -112,34 +122,34 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
   });
 }
 
-// Two % bars sharing one category, layered (not side-by-side): outer bar wider/
-// full-width (Breach%), inner bar narrower and lighter-shaded, drawn on top,
-// centered inside the outer bar's footprint (BBD%). Uses grouped:false so
-// Chart.js doesn't offset them side-by-side like a normal multi-series bar chart.
 // TRUE stacked bar (matches the "Long Tail Bifurcation %" reference style):
-// BBD% forms the base segment, Breach% stacks on top of it, each segment
-// labeled with its own value directly inside the bar.
+// BBD% forms the base segment, Breach% stacks on top of it. Values only ever
+// show on hover — see TOOLTIP_STYLE note above.
 function makeNestedBarChart(canvasId, labels, breachValues, breachLabel, bddValues, bddLabel, baselineValue) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
-  const showLabels = labels.length <= 10;
   const datasets = [
     { type: 'bar', label: bddLabel, data: bddValues, backgroundColor: 'rgba(79,179,232,0.85)',
       stack: 'breachStack', order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
-      datalabels: { display: showLabels, anchor: 'center', align: 'center', color: '#0B2138', font: { size: 10, weight: '700' }, formatter: v => v > 0.05 ? v.toFixed(1) + '%' : '' } },
+      datalabels: { display: false } },
     { type: 'bar', label: breachLabel, data: breachValues, backgroundColor: COLOR.navyLine,
       stack: 'breachStack', order: 1, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
-      datalabels: { display: showLabels, anchor: 'center', align: 'center', color: '#fff', font: { size: 10, weight: '700' }, formatter: v => v > 0.05 ? v.toFixed(1) + '%' : '' } },
+      datalabels: { display: false } },
   ];
   const baseline = baselineLineDataset(baselineValue, labels.length, 'y');
   if (baseline) { baseline.order = 0; datasets.push(baseline); }
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 32 } }, interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: true, position: 'top', align: 'start', reverse: true,
-        padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } } },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 16 } }, interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', align: 'start', reverse: true,
+          padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
+        tooltip: { ...TOOLTIP_STYLE, callbacks: {
+          label: ctx => ctx.dataset.label === 'Baseline' ? ` Baseline: ${ctx.formattedValue}%` : ` ${ctx.dataset.label}: ${ctx.formattedValue}%`,
+        } },
+      },
       scales: {
         y: { stacked: true, position: 'left', beginAtZero: true, title: { display: true, text: '%', font: { size: 10 } },
           ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
@@ -154,24 +164,26 @@ function makeDualMetricCombo(canvasId, labels, barValues, barLabel, lineValues, 
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
-  const showLabels = labels.length <= 10;
   const datasets = [
     { type: 'bar', label: barLabel, data: barValues, backgroundColor: COLOR.bar, borderColor: COLOR.barBorder,
       borderWidth: 1, borderRadius: 4, order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
-      datalabels: { display: showLabels, anchor: 'end', align: 'top', color: '#3E7CA6', font: { size: 10, weight: '600' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
+      datalabels: { display: false } },
     { type: 'line', label: lineLabel, data: lineValues, borderColor: COLOR.navyLine, backgroundColor: 'rgba(22,50,79,0.08)',
       borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.navyLine, pointBorderWidth: 2,
       tension: 0.3, fill: false, order: 1,
-      datalabels: { display: showLabels, align: 'top', offset: 8, color: COLOR.navyLine, font: { size: 11, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
+      datalabels: { display: false } },
   ];
   const baseline = baselineLineDataset(baselineValue, labels.length);
   if (baseline) datasets.push(baseline);
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 32 } }, interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: true, position: 'top', align: 'start', reverse: false,
-        padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } } },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 16 } }, interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', align: 'start', reverse: false,
+          padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
+        tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.formattedValue}%` } },
+      },
       scales: {
         y: { position: 'left', beginAtZero: true, title: { display: true, text: '%', font: { size: 10 } },
           ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
@@ -181,28 +193,28 @@ function makeDualMetricCombo(canvasId, labels, barValues, barLabel, lineValues, 
   });
 }
 
-// Two plain lines sharing one axis (e.g. DM share vs 3P share)
+// Two plain lines sharing one axis (e.g. Inhouse share vs 3P share)
 function makeDualLineChart(canvasId, labels, series1, label1, series2, label2, yLabel) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
-  const showLabels = labels.length <= 10;
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: { labels, datasets: [
       { label: label1, data: series1, borderColor: COLOR.singleLine, backgroundColor: 'transparent',
         borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.singleLine, pointBorderWidth: 2,
-        tension: 0.3, fill: false,
-        datalabels: { display: showLabels, align: 'top', offset: 6, color: COLOR.singleLine, font: { size: 10, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
+        tension: 0.3, fill: false, datalabels: { display: false } },
       { label: label2, data: series2, borderColor: COLOR.secondLine, backgroundColor: 'transparent',
         borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.secondLine, pointBorderWidth: 2,
-        tension: 0.3, fill: false,
-        datalabels: { display: showLabels, align: 'bottom', offset: 6, color: COLOR.secondLine, font: { size: 10, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
+        tension: 0.3, fill: false, datalabels: { display: false } },
     ]},
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 32 } }, interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: true, position: 'top', align: 'start',
-        padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } } },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 16 } }, interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', align: 'start',
+          padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
+        tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.formattedValue}%` } },
+      },
       scales: {
         y: { title: { display: true, text: yLabel, font: { size: 10 } }, ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
         x: { ticks: { font: { size: 10 } }, grid: { display: false } },
@@ -215,19 +227,21 @@ function makeSingleLineChart(canvasId, labels, values, label, yLabel) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
-  const showLabels = labels.length <= 10;
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: { labels, datasets: [{
       label, data: values, borderColor: COLOR.singleLine, backgroundColor: 'rgba(79,179,232,0.10)',
       borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.singleLine,
       pointBorderWidth: 2, fill: true, tension: 0.3,
-      datalabels: { display: showLabels, align: 'top', offset: 6, color: COLOR.singleLine, font: { size: 10, weight: '700' } },
+      datalabels: { display: false },
     }]},
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 32 } }, interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: true, position: 'top', align: 'start',
-        padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } } },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 16 } }, interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', align: 'start',
+          padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
+        tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.formattedValue}` } },
+      },
       scales: {
         y: { title: { display: true, text: yLabel, font: { size: 10 } }, ticks: { font: { size: 10 } }, grid: { color: '#F0F4F8' } },
         x: { ticks: { font: { size: 10 } }, grid: { display: false } },
@@ -252,6 +266,7 @@ function nonQcChartCardsHTML(cityMeta) {
 
 function qcChartCardsHTML(cityMeta) {
   return `
+    <div class="chart-card"><h3><span class="card-dot dot-share"></span>Rider Share (Inhouse vs 3P)</h3><div class="chart-canvas-wrap"><canvas id="chartRiderShare"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach % + BBD % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (hrs)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
@@ -260,6 +275,7 @@ function qcChartCardsHTML(cityMeta) {
 
 function storeChartCardsHTML() {
   return `
+    <div class="chart-card"><h3><span class="card-dot dot-share"></span>Rider Share (Inhouse vs 3P)</h3><div class="chart-canvas-wrap"><canvas id="chartRiderShare"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach % + BBD % <span class="baseline-legend"><span class="baseline-swatch"></span>Baseline 40.0%</span></h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % <span class="baseline-legend"><span class="baseline-swatch"></span>Baseline 4.0%</span></h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (hrs)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>`;
@@ -290,12 +306,15 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
 }
 
 function renderQcCharts(cityMeta, rawSeries, period) {
-  const pctFields = ['breachPct','breachWithTolPct','bbdBreachPct','ltPct'];
+  const pctFields = ['breachPct','breachWithTolPct','bbdBreachPct','ltPct','dmSharePct','tpSharePct'];
   const avgFields = ['p80LmTat'];
   const series = period === 'WoW' ? toWeekly(rawSeries, pctFields, avgFields) : rawSeries;
   const labels = series.map(r => period === 'WoW' ? fmtWeekLabel(r.date) : fmtDayLabel(r.date));
   const orders = series.map(r => r.orders);
 
+  makeDualLineChart('chartRiderShare', labels,
+    series.map(r => r.dmSharePct != null ? round1_(r.dmSharePct * 100) : null), 'Inhouse Share %',
+    series.map(r => r.tpSharePct != null ? round1_(r.tpSharePct * 100) : null), '3P Share %', '%');
   makeNestedBarChart('chartBreachBdd', labels,
     series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach %',
     series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %',
@@ -308,11 +327,14 @@ function renderQcCharts(cityMeta, rawSeries, period) {
 }
 
 function renderStoreCharts(rawSeries, period) {
-  const pctFields = ['breachPct','breachWithTolPct','bbdBreachPct','ltPct'];
+  const pctFields = ['breachPct','breachWithTolPct','bbdBreachPct','ltPct','dmSharePct','tpSharePct'];
   const avgFields = ['p80LmTat'];
   const series = period === 'WoW' ? toWeekly(rawSeries, pctFields, avgFields) : rawSeries;
   const labels = series.map(r => period === 'WoW' ? fmtWeekLabel(r.date) : fmtDayLabel(r.date));
 
+  makeDualLineChart('chartRiderShare', labels,
+    series.map(r => r.dmSharePct != null ? round1_(r.dmSharePct * 100) : null), 'Inhouse Share %',
+    series.map(r => r.tpSharePct != null ? round1_(r.tpSharePct * 100) : null), '3P Share %', '%');
   makeNestedBarChart('chartBreachBdd', labels,
     series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach %',
     series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %',
@@ -411,7 +433,7 @@ function panIndiaAgeingBarHTML(ageing, service, panIndia) {
       ${hasAgeing ? `
       <div class="pan-india-divider"></div>
       <div class="pan-india-total">
-        <div class="pan-india-label">Ageing (D-1)</div>
+        <div class="pan-india-label">Ageing &gt; (D-0)</div>
         <div class="pan-india-value" style="font-size:22px;">${ageing.total.toLocaleString()}</div>
       </div>
       <div class="pan-india-buckets">
