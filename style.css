@@ -293,7 +293,25 @@ select.control-select {
   margin: 0 0 4px;
   color: var(--header-blue-2);
   font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+
+.card-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.dot-breach { background: #C0392B; }
+.dot-lt { background: #4FB3E8; }
+.dot-cancel { background: #E67E22; }
+.dot-sdd { background: #8E44AD; }
+.dot-retry { background: #D68910; }
+.dot-tat { background: #16A085; }
 
 .chart-card .sub {
   font-size: 11.5px;
