@@ -136,11 +136,11 @@ function makeNestedBarChart(canvasId, labels, breachValues, breachLabel, bddValu
   if (!canvas) return;
   const datasets = [
     { type: 'bar', label: bddLabel, data: bddValues, backgroundColor: 'rgba(196,120,138,0.85)',
-      stack: 'breachStack', order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
+      stack: 'breachStack', order: 2, maxBarThickness: 90, barPercentage: 0.85, categoryPercentage: 0.9,
       datalabels: { display: 'auto', clamp: true, anchor: 'center', align: 'center', color: '#3A0E17',
         font: { size: 10, weight: '700' }, formatter: v => v > 0.05 ? v.toFixed(1) + '%' : '' } },
     { type: 'bar', label: breachLabel, data: breachValues, backgroundColor: COLOR.navyLine,
-      stack: 'breachStack', order: 1, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
+      stack: 'breachStack', order: 1, maxBarThickness: 90, barPercentage: 0.85, categoryPercentage: 0.9,
       datalabels: { display: 'auto', clamp: true, anchor: 'center', align: 'center', color: '#fff',
         font: { size: 10, weight: '700' }, formatter: v => v > 0.05 ? v.toFixed(1) + '%' : '' } },
   ];
