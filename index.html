@@ -27,7 +27,6 @@
   </div>
   <div class="controls">
     <button id="refreshBtn" class="btn-icon-refresh" title="Fetch live data from sheet" onclick="doRefresh()">⟳</button>
-    <button id="downloadReportBtn" class="nav-btn" onclick="downloadReport()">⬇ Download Report</button>
     <a class="nav-btn" href="explore.html">All Cities →</a>
     <div class="toggle-group" id="serviceToggle">
       <button data-val="Non-QC Inhouse" class="active">Non-QC</button>
@@ -159,36 +158,6 @@ async function doRefresh() {
   btn.disabled = true;
   try { await load(true); }
   finally { btn.classList.remove('spinning'); btn.disabled = false; }
-}
-
-async function downloadReport() {
-  const btn = document.getElementById('downloadReportBtn');
-  const originalText = btn.textContent;
-  btn.textContent = 'Generating…';
-  btn.disabled = true;
-  try {
-    const url = `${WEBAPP_URL}?action=generateReport&service=${encodeURIComponent(state.service)}&period=${state.period}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-
-    const byteChars = atob(data.base64);
-    const byteNumbers = new Array(byteChars.length);
-    for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
-    const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = data.filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  } catch (err) {
-    alert("Couldn't generate report: " + err.message);
-  } finally {
-    btn.textContent = originalText;
-    btn.disabled = false;
-  }
 }
 
 function renderHomeData(data) {
