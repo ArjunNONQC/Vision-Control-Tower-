@@ -89,6 +89,7 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
+  const showLabels = labels.length <= 10;
   const datasets = [
     { type: 'bar', label: 'Orders', yAxisID: 'yOrders', data: orders, backgroundColor: COLOR.bar,
       borderColor: COLOR.barBorder, borderWidth: 1, borderRadius: 4, order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
@@ -96,13 +97,15 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
     { type: 'line', label: pctLabel, yAxisID: 'yPct', data: pctValues, borderColor: COLOR.navyLine,
       backgroundColor: 'rgba(22,50,79,0.08)', borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff',
       pointBorderColor: COLOR.navyLine, pointBorderWidth: 2, tension: 0.3, fill: false, order: 1,
-      datalabels: { display: false } },
+      datalabels: { display: showLabels, clamp: true, align: ctx => ctx.dataIndex % 2 === 0 ? 'top' : 'bottom',
+        offset: 8, color: COLOR.navyLine, font: { size: 11, weight: '700' },
+        formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
   ];
   if (extraLineDatasets) datasets.push(...extraLineDatasets);
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 16 } }, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'top', align: 'start', reverse: false,
           padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
@@ -123,26 +126,29 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
 }
 
 // TRUE stacked bar (matches the "Long Tail Bifurcation %" reference style):
-// BBD% forms the base segment, Breach% stacks on top of it. Values only ever
-// show on hover — see TOOLTIP_STYLE note above.
+// BBD% forms the base segment, Breach% stacks on top of it, each segment
+// labeled with its own value directly inside the bar.
 function makeNestedBarChart(canvasId, labels, breachValues, breachLabel, bddValues, bddLabel, baselineValue) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
+  const showLabels = labels.length <= 10;
   const datasets = [
     { type: 'bar', label: bddLabel, data: bddValues, backgroundColor: 'rgba(79,179,232,0.85)',
       stack: 'breachStack', order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
-      datalabels: { display: false } },
+      datalabels: { display: showLabels, clamp: true, anchor: 'center', align: 'center', color: '#0B2138',
+        font: { size: 10, weight: '700' }, formatter: v => v > 0.05 ? v.toFixed(1) + '%' : '' } },
     { type: 'bar', label: breachLabel, data: breachValues, backgroundColor: COLOR.navyLine,
       stack: 'breachStack', order: 1, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
-      datalabels: { display: false } },
+      datalabels: { display: showLabels, clamp: true, anchor: 'center', align: 'center', color: '#fff',
+        font: { size: 10, weight: '700' }, formatter: v => v > 0.05 ? v.toFixed(1) + '%' : '' } },
   ];
   const baseline = baselineLineDataset(baselineValue, labels.length, 'y');
   if (baseline) { baseline.order = 0; datasets.push(baseline); }
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 16 } }, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'top', align: 'start', reverse: true,
           padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
@@ -164,21 +170,24 @@ function makeDualMetricCombo(canvasId, labels, barValues, barLabel, lineValues, 
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
+  const showLabels = labels.length <= 10;
   const datasets = [
     { type: 'bar', label: barLabel, data: barValues, backgroundColor: COLOR.bar, borderColor: COLOR.barBorder,
       borderWidth: 1, borderRadius: 4, order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
-      datalabels: { display: false } },
+      datalabels: { display: showLabels, clamp: true, anchor: 'end', align: 'top', color: '#3E7CA6',
+        font: { size: 10, weight: '600' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
     { type: 'line', label: lineLabel, data: lineValues, borderColor: COLOR.navyLine, backgroundColor: 'rgba(22,50,79,0.08)',
       borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.navyLine, pointBorderWidth: 2,
       tension: 0.3, fill: false, order: 1,
-      datalabels: { display: false } },
+      datalabels: { display: showLabels, clamp: true, align: 'top', offset: 8, color: COLOR.navyLine,
+        font: { size: 11, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
   ];
   const baseline = baselineLineDataset(baselineValue, labels.length);
   if (baseline) datasets.push(baseline);
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 16 } }, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'top', align: 'start', reverse: false,
           padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
@@ -198,18 +207,23 @@ function makeDualLineChart(canvasId, labels, series1, label1, series2, label2, y
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
+  const showLabels = labels.length <= 10;
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: { labels, datasets: [
       { label: label1, data: series1, borderColor: COLOR.singleLine, backgroundColor: 'transparent',
         borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.singleLine, pointBorderWidth: 2,
-        tension: 0.3, fill: false, datalabels: { display: false } },
+        tension: 0.3, fill: false,
+        datalabels: { display: showLabels, clamp: true, align: 'top', offset: 6, color: COLOR.singleLine,
+          font: { size: 10, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
       { label: label2, data: series2, borderColor: COLOR.secondLine, backgroundColor: 'transparent',
         borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.secondLine, pointBorderWidth: 2,
-        tension: 0.3, fill: false, datalabels: { display: false } },
+        tension: 0.3, fill: false,
+        datalabels: { display: showLabels, clamp: true, align: 'bottom', offset: 6, color: COLOR.secondLine,
+          font: { size: 10, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
     ]},
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 16 } }, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'top', align: 'start',
           padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
@@ -227,16 +241,18 @@ function makeSingleLineChart(canvasId, labels, values, label, yLabel) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
+  const showLabels = labels.length <= 10;
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: { labels, datasets: [{
       label, data: values, borderColor: COLOR.singleLine, backgroundColor: 'rgba(79,179,232,0.10)',
       borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.singleLine,
       pointBorderWidth: 2, fill: true, tension: 0.3,
-      datalabels: { display: false },
+      datalabels: { display: showLabels, clamp: true, align: ctx => ctx.dataIndex % 2 === 0 ? 'top' : 'bottom',
+        offset: 6, color: COLOR.singleLine, font: { size: 10, weight: '700' } },
     }]},
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 16 } }, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 30 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'top', align: 'start',
           padding: 14, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
@@ -401,7 +417,7 @@ function panIndiaAgeingBarHTML(ageing, service, panIndia) {
   const hasAgeing = ageing && ageing.total;
   const hasMetrics = panIndia && panIndia.orders != null;
   if (!hasAgeing && !hasMetrics) {
-    return `<div class="pan-india-bar"><div class="pan-india-icon">🌐</div><div class="pan-india-label">PAN INDIA · ${service}</div><div class="pan-india-empty">No data yet</div></div>`;
+    return `<div class="pan-india-bar"><div class="pan-india-icon"><img src="pan-india-icon.png" alt="India" /></div><div class="pan-india-label">PAN INDIA · ${service}</div><div class="pan-india-empty">No data yet</div></div>`;
   }
   const pct = n => (hasAgeing && ageing.total) ? ((n / ageing.total) * 100).toFixed(1) + '%' : '0%';
   const buckets = hasAgeing ? [
@@ -410,7 +426,7 @@ function panIndiaAgeingBarHTML(ageing, service, panIndia) {
   ] : [];
   return `
     <div class="pan-india-bar">
-      <div class="pan-india-icon">🌐</div>
+      <div class="pan-india-icon"><img src="pan-india-icon.png" alt="India" /></div>
       <div class="pan-india-total">
         <div class="pan-india-label">PAN INDIA · ${service}</div>
         <div class="pan-india-value">${hasMetrics ? panIndia.orders.toLocaleString() : '—'}</div>
@@ -455,51 +471,58 @@ function schemaWarningHTML(schemaWarnings) {
   const nq = schemaWarnings.dumpNonQcMissingColumns || [];
   const qc = schemaWarnings.dumpQcMissingColumns || [];
   const sdd = schemaWarnings.sddFasterMissingColumns || [];
-  if (!nq.length && !qc.length && !sdd.length) return '';
+  const canc = schemaWarnings.cancellationNonQcMissingColumns || [];
+  if (!nq.length && !qc.length && !sdd.length && !canc.length) return '';
   const parts = [];
   if (nq.length) parts.push(`Dump NONQC: couldn't find column(s) for ${nq.join(', ')}`);
   if (qc.length) parts.push(`Dump QC: couldn't find column(s) for ${qc.join(', ')}`);
   if (sdd.length) parts.push(`SDD & Faster %: couldn't find column(s) for ${sdd.join(', ')}`);
+  if (canc.length) parts.push(`Cancellation Non-QC: couldn't find column(s) for ${canc.join(', ')}`);
   return `<div class="schema-warning">⚠ Sheet column mismatch — ${parts.join(' · ')}. Those fields are reading as 0 until the header names match.</div>`;
 }
 
-// City landmark icons — simple flat single-color line icons, one per city,
-// matching a clean/minimal premium style. First-pass set: consistent visual
-// weight across all 23, refined individually later if any doesn't read well.
-// Keys are normalized (uppercase) city names; falls back to a generic city
-// building icon for anything not in this list.
-const CITY_ICON_SVGS = {
-  'BANGALORE': '<path d="M4 21h16M6 21V9l3-2h6l3 2v12M9 21V9M15 21V9M12 9V4"/><circle cx="12" cy="4" r="1.5"/>', // Vidhana Soudha — dome + columns
-  'BHUBANESHWAR': '<path d="M12 2v6M8 21V13a4 4 0 0 1 8 0v8M5 21h14M12 8l-2 2h4l-2-2z"/>', // Lingaraj Temple — tall shikhara tower
-  'CHENNAI': '<path d="M5 21V11l7-8 7 8v10M5 21h14M9 21v-6h6v6"/>', // Kapaleeshwarar — stepped gopuram
-  'DEHRADUN': '<path d="M12 3l3 5H9l3-5zM12 8l4 6h-8l4-6zM6 21v-4M18 21v-4M4 21h16"/>', // Forest Research Institute — pine + building
-  'ERNAKULAM': '<path d="M4 20h4M4 20v-6l4-2M4 12v-3M20 20h-4M20 20v-6l-4-2M20 12v-3M12 20V9M8 9h8"/>', // Chinese fishing nets
-  'FARIDABAD': '<path d="M4 21V9l3-2 3 2v12M11 21V9l3-2 3 2v12M4 21h16M7 5v2M14 5v2"/>', // Raja Nahar Singh Palace — twin domes
-  'GHAZIABAD': '<path d="M6 21V10a6 6 0 0 1 12 0v11M6 21h12M10 21v-5h4v5"/>', // Dasna Gate — archway
-  'GREATER NOIDA': '<path d="M3 17c4-6 14-6 18 0M3 17h18M6 17c1-3 3-3 4 0M14 17c1-3 3-3 4 0"/>', // Buddh Circuit — curved track
-  'GURGAON': '<path d="M4 21V7l4-2 4 2v14M12 21V4l4-2 4 2v17M4 21h16"/>', // Cyber Hub — glass towers
-  'GUWAHATI': '<path d="M12 3c-2 3-2 5 0 6s2 3 0 6M6 21v-6a6 6 0 0 1 12 0v6M4 21h16"/>', // Kamakhya Temple — beehive roof
-  'HYDERABAD': '<path d="M4 21V9M9 21V6M15 21V6M20 21V9M4 21h16M9 6l2-3 2 3M15 6l2-3 2 3"/>', // Charminar — four minarets
-  'JAIPUR': '<path d="M5 21V9h3v3H5m3-3h3v3H8m3-3h3v3h-3m3-3h3v3h-3M5 21h14"/>', // Hawa Mahal — lattice facade
-  'JAMSHEDPUR': '<path d="M12 21V11M8 21v-6M16 21v-6M12 11l-3-3M12 11l3-3M4 21h16"/>', // Jubilee Park — tree + gate
-  'KANPUR': '<path d="M12 3v3M8 21V10a4 4 0 0 1 8 0v11M4 21h16M9 6h6"/>', // JK Temple — dome
-  'KOLKATA': '<path d="M12 2v3M7 21V11a5 5 0 0 1 10 0v10M4 21h16M9 11h6"/>', // Victoria Memorial — grand dome
-  'LUCKNOW': '<path d="M6 21V13a6 6 0 0 1 12 0v8M6 21h12M12 13a3 3 0 0 0 0-6"/>', // Bara Imambara — large dome
-  'MUMBAI': '<path d="M6 21V8c0-3 2.5-5 6-5s6 2 6 5v13M6 21h12M6 14h12"/>', // Gateway of India — arch
-  'DELHI': '<path d="M6 21V9c0-4 2.5-6 6-6s6 2 6 6v12M6 21h12M6 12h12"/>', // India Gate — arch
-  'NEW DELHI': '<path d="M6 21V9c0-4 2.5-6 6-6s6 2 6 6v12M6 21h12M6 12h12"/>',
-  'NOIDA': '<path d="M3 16a9 5 0 0 1 18 0M3 16v3h18v-3M3 16a9 5 0 0 0 18 0"/>', // Noida Stadium — bowl
-  'PANCHKULA': '<path d="M12 21V9M12 9c-2 0-3-1-3-3M12 9c2 0 3-1 3-3M12 6c-1 0-2-1-2-2M12 6c1 0 2-1 2-2M4 21h16"/>', // Cactus Garden
-  'PATNA': '<path d="M12 3c4 0 6 4 6 8s-2 5-6 5-6-1-6-5 2-8 6-8zM12 16v5M8 21h8"/>', // Golghar — beehive granary
-  'PUNE': '<path d="M4 21V13l3-2 3 2v8M11 21V13l3-2 3 2v8M4 21h16M6 8v2M17 8v2"/>', // Shaniwar Wada — fort towers
-  'ROI': '<path d="M12 2a5 5 0 0 1 5 5c0 4-5 9-5 9s-5-5-5-9a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="2"/>', // generic India-pin
+// City landmark icons — reusable, data-driven system: each city maps to a
+// distinct {color, path}, so every landmark reads as its own thing rather
+// than a uniform icon set. Keys are normalized (uppercase) city names; any
+// city not listed here falls back to a neutral generic landmark icon
+// automatically (see cityIconHTML_) — adding a new city to the dashboard
+// never breaks the icon system, it just gets the fallback until given its
+// own entry here.
+const CITY_ICON_DATA = {
+  'MUMBAI':        { color: '#C97A2B', path: '<path d="M6 21V8c0-3 2.5-5 6-5s6 2 6 5v13M6 21h12M6 14h12"/>' }, // Gateway of India — sandstone arch
+  'DELHI':         { color: '#B5342A', path: '<path d="M6 21V9c0-4 2.5-6 6-6s6 2 6 6v12M6 21h12M6 12h12"/>' }, // India Gate — red sandstone arch
+  'NEW DELHI':     { color: '#B5342A', path: '<path d="M6 21V9c0-4 2.5-6 6-6s6 2 6 6v12M6 21h12M6 12h12"/>' },
+  'JAIPUR':        { color: '#D6488A', path: '<path d="M5 21V9h3v3H5m3-3h3v3H8m3-3h3v3h-3m3-3h3v3h-3M5 21h14"/>' }, // Hawa Mahal — Pink City
+  'KOLKATA':       { color: '#4A6D8C', path: '<path d="M3 15h18M6 15V9l6-3 6 3v6M6 12h12M12 6V3M9 21l3-6 3 6"/>' }, // Howrah Bridge — steel-grey cantilever
+  'CHENNAI':       { color: '#1F9E93', path: '<path d="M12 3l2 6h-4l2-6zM10 9h4v10h-4zM8 21h8M11 12h2M11 15h2"/>' }, // Chennai Lighthouse — Marina teal
+  'HYDERABAD':     { color: '#7A4FA3', path: '<path d="M4 21V9M9 21V6M15 21V6M20 21V9M4 21h16M9 6l2-3 2 3M15 6l2-3 2 3"/>' }, // Charminar — regal purple
+  'BANGALORE':     { color: '#2E8B57', path: '<path d="M4 21h16M6 21V9l3-2h6l3 2v12M9 21V9M15 21V9M12 9V4"/><circle cx="12" cy="4" r="1.5"/>' }, // Vidhana Soudha — Garden City green
+  'BENGALURU':     { color: '#2E8B57', path: '<path d="M4 21h16M6 21V9l3-2h6l3 2v12M9 21V9M15 21V9M12 9V4"/><circle cx="12" cy="4" r="1.5"/>' },
+  'PUNE':          { color: '#A0522D', path: '<path d="M4 21V13l3-2 3 2v8M11 21V13l3-2 3 2v8M4 21h16M6 8v2M17 8v2"/>' }, // Shaniwar Wada — terracotta fort
+  'LUCKNOW':       { color: '#C9A227', path: '<path d="M6 21V13a6 6 0 0 1 12 0v8M6 21h12M12 13a3 3 0 0 0 0-6"/>' }, // Bara Imambara — Nawabi gold
+  'BHUBANESHWAR':  { color: '#E06A2C', path: '<circle cx="12" cy="15" r="6"/><path d="M12 9v12M6 15h12M7.8 10.8l8.4 8.4M16.2 10.8l-8.4 8.4"/>' }, // Konark Sun Temple wheel
+  'AHMEDABAD':     { color: '#2B7FB0', path: '<path d="M5 21v-4a2 2 0 0 1 2-2 2 2 0 0 1 2 2v4M11 21v-6a2 2 0 0 1 2-2 2 2 0 0 1 2 2v6M17 21v-8a2 2 0 0 1 2-2 2 2 0 0 1 2 2v8M3 21h18"/>' }, // Adalaj Stepwell — stepped tiers, water blue
+  'GURGAON':       { color: '#5A6B7A', path: '<path d="M4 21V7l4-2 4 2v14M12 21V4l4-2 4 2v17M4 21h16"/>' }, // Cyber Hub — modern slate
+  'NOIDA':         { color: '#5A6B7A', path: '<path d="M3 16a9 5 0 0 1 18 0M3 16v3h18v-3M3 16a9 5 0 0 0 18 0"/>' }, // Noida Stadium — modern slate
+  'FARIDABAD':     { color: '#5A6B7A', path: '<path d="M4 21V11l4-2 4 2v10M12 21V8l4-2 4 2v13M4 21h16"/>' }, // NCR skyline — modern slate
+  'GREATER NOIDA': { color: '#5A6B7A', path: '<path d="M3 17c4-6 14-6 18 0M3 17h18M6 17c1-3 3-3 4 0M14 17c1-3 3-3 4 0"/>' }, // Buddh Circuit — modern slate
+  'GHAZIABAD':     { color: '#8A6D3A', path: '<path d="M6 21V10a6 6 0 0 1 12 0v11M6 21h12M10 21v-5h4v5"/>' }, // Dasna Gate
+  'DEHRADUN':      { color: '#3F7D4A', path: '<path d="M12 3l3 5H9l3-5zM12 8l4 6h-8l4-6zM6 21v-4M18 21v-4M4 21h16"/>' }, // FRI — forest green
+  'ERNAKULAM':     { color: '#2B8C8C', path: '<path d="M4 20h4M4 20v-6l4-2M4 12v-3M20 20h-4M20 20v-6l-4-2M20 12v-3M12 20V9M8 9h8"/>' }, // Chinese fishing nets — backwater teal
+  'JAMSHEDPUR':    { color: '#3F7D4A', path: '<path d="M12 21V11M8 21v-6M16 21v-6M12 11l-3-3M12 11l3-3M4 21h16"/>' }, // Jubilee Park
+  'KANPUR':        { color: '#C9A227', path: '<path d="M12 3v3M8 21V10a4 4 0 0 1 8 0v11M4 21h16M9 6h6"/>' }, // JK Temple
+  'GUWAHATI':      { color: '#B5342A', path: '<path d="M12 3c-2 3-2 5 0 6s2 3 0 6M6 21v-6a6 6 0 0 1 12 0v6M4 21h16"/>' }, // Kamakhya Temple
+  'PANCHKULA':     { color: '#4E8B3F', path: '<path d="M12 21V9M12 9c-2 0-3-1-3-3M12 9c2 0 3-1 3-3M12 6c-1 0-2-1-2-2M12 6c1 0 2-1 2-2M4 21h16"/>' }, // Cactus Garden
+  'PATNA':         { color: '#C9A227', path: '<path d="M12 3c4 0 6 4 6 8s-2 5-6 5-6-1-6-5 2-8 6-8zM12 16v5M8 21h8"/>' }, // Golghar
+  'ROI':           { color: '#1B4D8F', path: '<path d="M12 2a5 5 0 0 1 5 5c0 4-5 9-5 9s-5-5-5-9a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="2"/>' }, // generic India-pin
 };
+
+const CITY_ICON_FALLBACK = { color: '#6B7C8C', path: '<path d="M4 21V10l4-2 4 2v11M12 21V6l4-2 4 2v15M4 21h16"/>' };
 
 function cityIconHTML_(cityName) {
   const key = (cityName || '').toString().trim().toUpperCase();
-  const path = CITY_ICON_SVGS[key] ||
-    '<path d="M4 21V10l4-2 4 2v11M12 21V6l4-2 4 2v15M4 21h16"/>'; // generic city-building fallback
-  return `<svg class="city-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+  const data = CITY_ICON_DATA[key] || CITY_ICON_FALLBACK;
+  return `<svg class="city-icon" viewBox="0 0 24 24" fill="none" stroke="${data.color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${data.path}</svg>`;
 }
 
 function coldChainHTML(coldChain) {
