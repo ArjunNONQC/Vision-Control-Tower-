@@ -1,20 +1,24 @@
 :root {
-  --header-blue: #1B3A5C;
-  --header-blue-2: #2E5C8A;
-  --bg: #EAF2FA;
+  /* Wine/burgundy theme. Variable names kept as-is (bar-blue, line-navy, etc.)
+     to avoid touching every var() reference below — only the color VALUES
+     changed. RAG severity colors (red/amber/green) and cold-chain hot/cold
+     indicators are intentionally untouched. */
+  --header-blue: #5C1F2E;
+  --header-blue-2: #8B2F45;
+  --bg: #FAF1F2;
   --card-bg: #FFFFFF;
-  --border: #E1EAF2;
+  --border: #F0DEE2;
   --text: #16232E;
-  --text-muted: #6B7C8C;
+  --text-muted: #7A6570;
   --red: #E74C3C;
   --red-bg: #FDECEA;
   --amber: #D68910;
   --amber-bg: #FFF6E0;
   --green: #1E8449;
   --green-bg: #EAF7EE;
-  --bar-blue: rgba(125, 199, 240, 0.75);
-  --bar-blue-border: #4FB3E8;
-  --line-navy: #16324F;
+  --bar-blue: rgba(196, 120, 138, 0.75);
+  --bar-blue-border: #B0435F;
+  --line-navy: #4A1420;
 }
 
 * { box-sizing: border-box; }
@@ -297,18 +301,29 @@ select.control-select {
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 20px 22px 12px;
+  padding: 16px 22px 12px;
   box-shadow: 0 1px 6px rgba(22, 50, 79, 0.06);
 }
 
 .chart-card h3 {
   font-size: 15px;
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   color: var(--header-blue-2);
   font-weight: 800;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Emoji stat icons (📦 🌡️ ⏳ 🔁 ⚠ ⏱) used in scorecards and the pan-India
+   bar — sized independently of the label text next to them. Does NOT apply
+   to the header .vision-icon logo. */
+.stat-icon {
+  display: inline-block;
+  font-size: 1.7em;
+  line-height: 1;
+  vertical-align: -0.32em;
+  margin-right: 2px;
 }
 
 .card-dot {
@@ -431,8 +446,8 @@ select.control-select {
   border-radius: 50%;
   margin-right: 6px;
 }
-.dot.qc { background: #4FB3E8; }
-.dot.nonqc { background: #16324F; }
+.dot.qc { background: var(--bar-blue-border); }
+.dot.nonqc { background: var(--header-blue); }
 
 /* Cold chain breach panel */
 .cold-scorecard { min-width: 340px; }
