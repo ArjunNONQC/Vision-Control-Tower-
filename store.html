@@ -35,6 +35,7 @@
 <script>
 const params = new URLSearchParams(window.location.search);
 const STORE_CODE = params.get('store');
+const CITY_HINT = params.get('city');
 let period = 'DoD';
 let rawSeries = null;
 
@@ -49,7 +50,7 @@ document.getElementById('periodToggle').addEventListener('click', (e) => {
 async function load(force) {
   document.getElementById('chartGrid').innerHTML = '<div class="loading">Loading…</div>';
   try {
-    const data = await fetchStoreData(STORE_CODE, renderStoreData, force);
+    const data = await fetchStoreData(STORE_CODE, CITY_HINT, renderStoreData, force);
     renderStoreData(data);
   } catch (err) {
     document.getElementById('chartGrid').innerHTML = loadErrorHTML(err.message, 'load');
