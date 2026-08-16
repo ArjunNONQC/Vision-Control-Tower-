@@ -281,7 +281,8 @@ function nonQcChartCardsHTML(cityMeta) {
 function qcChartCardsHTML(cityMeta) {
   return `
     <div class="chart-card"><h3><span class="card-dot dot-share"></span>Rider Share (Inhouse vs 3P)</h3><div class="chart-canvas-wrap"><canvas id="chartRiderShare"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach % + BBD % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach %</h3><div class="chart-canvas-wrap"><canvas id="chartBreachPlain"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD% ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (hrs)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
     <div class="chart-card span-2"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>`;
@@ -290,7 +291,8 @@ function qcChartCardsHTML(cityMeta) {
 function storeChartCardsHTML() {
   return `
     <div class="chart-card"><h3><span class="card-dot dot-share"></span>Rider Share (Inhouse vs 3P)</h3><div class="chart-canvas-wrap"><canvas id="chartRiderShare"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach % + BBD % <span class="baseline-legend"><span class="baseline-swatch"></span>Baseline 40.0%</span></h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach %</h3><div class="chart-canvas-wrap"><canvas id="chartBreachPlain"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD% <span class="baseline-legend"><span class="baseline-swatch"></span>Baseline 40.0%</span></h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % <span class="baseline-legend"><span class="baseline-swatch"></span>Baseline 4.0%</span></h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (hrs)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>`;
 }
@@ -329,8 +331,9 @@ function renderQcCharts(cityMeta, rawSeries, period) {
   makeDualLineChart('chartRiderShare', labels,
     series.map(r => r.dmSharePct != null ? round1_(r.dmSharePct * 100) : null), 'Inhouse Share %',
     series.map(r => r.tpSharePct != null ? round1_(r.tpSharePct * 100) : null), '3P Share %', '%');
+  makeComboChart('chartBreachPlain', labels, orders, series.map(r => round1_(r.breachPct * 100)), 'Breach %', null);
   makeNestedBarChart('chartBreachBdd', labels,
-    series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach %',
+    series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach with Tol %',
     series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %',
     cityMeta.overallBreachBaseline);
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
@@ -345,15 +348,17 @@ function renderStoreCharts(rawSeries, period) {
   const avgFields = ['p80LmTat'];
   const series = period === 'WoW' ? toWeekly(rawSeries, pctFields, avgFields) : rawSeries;
   const labels = series.map(r => period === 'WoW' ? fmtWeekLabel(r.date) : fmtDayLabel(r.date));
+  const orders = series.map(r => r.orders);
 
   makeDualLineChart('chartRiderShare', labels,
     series.map(r => r.dmSharePct != null ? round1_(r.dmSharePct * 100) : null), 'Inhouse Share %',
     series.map(r => r.tpSharePct != null ? round1_(r.tpSharePct * 100) : null), '3P Share %', '%');
+  makeComboChart('chartBreachPlain', labels, orders, series.map(r => round1_(r.breachPct * 100)), 'Breach %', null);
   makeNestedBarChart('chartBreachBdd', labels,
-    series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach %',
+    series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach with Tol %',
     series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %',
     0.40);
-  makeComboChart('chartLT', labels, series.map(r => r.orders), series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
+  makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
     [baselineLineDataset(0.04, series.length)].filter(Boolean));
   makeSingleLineChart('chartLmTat', labels, series.map(r => r.p80LmTat), 'P80 LM TAT (hrs)', 'Hours');
 }
@@ -470,12 +475,14 @@ function schemaWarningHTML(schemaWarnings) {
   const qc = schemaWarnings.dumpQcMissingColumns || [];
   const sdd = schemaWarnings.sddFasterMissingColumns || [];
   const canc = schemaWarnings.cancellationNonQcMissingColumns || [];
-  if (!nq.length && !qc.length && !sdd.length && !canc.length) return '';
+  const noBaseline = schemaWarnings.missingBaselineCities || [];
+  if (!nq.length && !qc.length && !sdd.length && !canc.length && !noBaseline.length) return '';
   const parts = [];
   if (nq.length) parts.push(`Dump NONQC: couldn't find column(s) for ${nq.join(', ')}`);
   if (qc.length) parts.push(`Dump QC: couldn't find column(s) for ${qc.join(', ')}`);
   if (sdd.length) parts.push(`SDD & Faster %: couldn't find column(s) for ${sdd.join(', ')}`);
   if (canc.length) parts.push(`Cancellation Non-QC: couldn't find column(s) for ${canc.join(', ')}`);
+  if (noBaseline.length) parts.push(`Base Config: no matching row for ${noBaseline.join(', ')} — their Breach % baseline won't be drawn until the city name in Base Config exactly matches Dump NONQC`);
   return `<div class="schema-warning">⚠ Sheet column mismatch — ${parts.join(' · ')}. Those fields are reading as 0 until the header names match.</div>`;
 }
 
@@ -561,8 +568,9 @@ function trendDirectionHTML(trend) {
 
 function storeListHTML(storesPayload) {
   if (!storesPayload || storesPayload.error || !storesPayload.stores.length) return '';
+  const cityParam = encodeURIComponent(storesPayload.city);
   const rows = storesPayload.stores.map(s => `
-    <div class="store-row" onclick="window.location.href='store.html?store=${encodeURIComponent(s.storeCode)}'">
+    <div class="store-row" onclick="window.location.href='store.html?store=${encodeURIComponent(s.storeCode)}&city=${cityParam}'">
       <span class="store-code">${s.storeCode}</span>
       <span>${trendDirectionHTML(s.trend)}</span>
       <span>${s.totalOrders.toLocaleString()}</span>
@@ -641,8 +649,9 @@ async function fetchCityData(city, service, onRevalidate, force) {
 async function fetchStoresData(city, force) {
   return cachedFetchJSON(`${WEBAPP_URL}?action=stores&city=${encodeURIComponent(city)}`, { force });
 }
-async function fetchStoreData(storeCode, onRevalidate, force) {
-  return cachedFetchJSON(`${WEBAPP_URL}?action=store&storeCode=${encodeURIComponent(storeCode)}`, { onRevalidate, force });
+async function fetchStoreData(storeCode, cityHint, onRevalidate, force) {
+  const cityQs = cityHint ? `&city=${encodeURIComponent(cityHint)}` : '';
+  return cachedFetchJSON(`${WEBAPP_URL}?action=store&storeCode=${encodeURIComponent(storeCode)}${cityQs}`, { onRevalidate, force });
 }
 
 // Runs a growing list of async tasks with a concurrency cap. Tasks are allowed
@@ -675,7 +684,7 @@ async function prefetchAllCitiesAndStores() {
       tasks.push(async () => {
         const sd = await fetchStoresData(city);
         if (sd && sd.stores) {
-          sd.stores.forEach(s => tasks.push(() => fetchStoreData(s.storeCode)));
+          sd.stores.forEach(s => tasks.push(() => fetchStoreData(s.storeCode, city)));
         }
       });
     });
