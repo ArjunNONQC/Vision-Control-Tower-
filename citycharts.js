@@ -648,8 +648,14 @@ function schemaWarningHTML(schemaWarnings) {
   const accept = schemaWarnings.qc3pAcceptanceMissingColumns || [];
   const eta = schemaWarnings.nonQcEtaMissingColumns || [];
   const nps = schemaWarnings.npsMissingColumns || [];
-  if (!nq.length && !qc.length && !sdd.length && !canc.length && !noBaseline.length && !eff.length && !accept.length && !eta.length && !nps.length) return '';
+  const missingTabs = schemaWarnings.missingTabs || [];
+  const joins = schemaWarnings.joinWarnings || [];
+  if (!missingTabs.length && !joins.length && !nq.length && !qc.length && !sdd.length && !canc.length && !noBaseline.length && !eff.length && !accept.length && !eta.length && !nps.length) return '';
   const parts = [];
+  // Tab-level failures come first: if the tab itself didn't resolve, every
+  // column warning under it is noise.
+  if (missingTabs.length) parts.push(`Tab(s) not found: ${missingTabs.join(', ')} — check the tab name matches exactly`);
+  joins.forEach(w => parts.push(w));
   if (nq.length) parts.push(`Dump NONQC: couldn't find column(s) for ${nq.join(', ')}`);
   if (qc.length) parts.push(`Dump QC: couldn't find column(s) for ${qc.join(', ')}`);
   if (sdd.length) parts.push(`SDD & Faster %: couldn't find column(s) for ${sdd.join(', ')}`);
