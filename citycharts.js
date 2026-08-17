@@ -43,6 +43,16 @@ function round1_(n) { return Math.round(n * 10) / 10; }
 const FONT_SCALE = 1.1;
 function fs(n) { return Math.round(n * FONT_SCALE * 10) / 10; }
 
+// Datalabels are drawn just outside each point, so a value sitting at the very
+// top of the plot area gets clipped by the canvas edge (the 64.1% / 64.5%
+// problem on Rider Share). Two things prevent that: grace reserves a slice of
+// axis range beyond the real min/max, and padding reserves pixels above the
+// plot area. grace is proportional, so it scales with the data instead of
+// needing a hand-tuned max per chart. Neither one alters a plotted value —
+// only the empty space around them.
+const Y_GRACE = '12%';
+const LABEL_PADDING_TOP = 26;
+
 function toWeekly(series, pctFields, avgFields) {
   const weeks = {};
   series.forEach(row => {
@@ -69,6 +79,16 @@ function toWeekly(series, pctFields, avgFields) {
     out.retries = rows.reduce((s, r) => s + (r.retries || 0), 0);
     out.sddOrders = rows.reduce((s, r) => s + (r.sddOrders || 0), 0);
     out.sddFasterOrders = rows.reduce((s, r) => s + (r.sddFasterOrders || 0), 0);
+
+    // These two are ratios with their OWN denominator, not delivered orders, so
+    // they can't be order-weighted like the pctFields above. retryRate was
+    // previously never set at all here, which left the Retry line blank in WoW;
+    // sddFasterPct was weighted by delivered orders instead of SDD orders.
+    // Recomputing both from the summed parts is exact for any week length.
+    out.retryRate = out.ofdOrders ? out.retries / out.ofdOrders : null;
+    if (pctFields.indexOf('sddFasterPct') !== -1) {
+      out.sddFasterPct = out.sddOrders ? out.sddFasterOrders / out.sddOrders : null;
+    }
     return out;
   });
 }
@@ -117,7 +137,7 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: LABEL_PADDING_TOP } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'bottom', align: 'center', reverse: false,
           padding: 12, labels: { boxWidth: 10, font: { size: fs(11), weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
@@ -129,7 +149,7 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
       scales: {
         yOrders: { position: 'left', beginAtZero: true, title: { display: true, text: ordersLabel, font: { size: fs(10) } },
           ticks: { font: { size: fs(10) } }, grid: { display: false } },
-        yPct: { position: 'right', beginAtZero: true, title: { display: true, text: '%', font: { size: fs(10) } },
+        yPct: { position: 'right', beginAtZero: true, grace: Y_GRACE, title: { display: true, text: '%', font: { size: fs(10) } },
           ticks: { font: { size: fs(10) }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
         x: { ticks: { font: { size: fs(10), weight: '700' } }, grid: { display: false } },
       },
@@ -163,7 +183,7 @@ function makeBreachBddChart(canvasId, labels, breachValues, breachLabel, bddValu
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: LABEL_PADDING_TOP } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'bottom', align: 'center', reverse: false,
           padding: 12, labels: { boxWidth: 10, font: { size: fs(11), weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
@@ -172,7 +192,7 @@ function makeBreachBddChart(canvasId, labels, breachValues, breachLabel, bddValu
         } },
       },
       scales: {
-        y: { position: 'left', beginAtZero: true, title: { display: true, text: '%', font: { size: fs(10) } },
+        y: { position: 'left', beginAtZero: true, grace: Y_GRACE, title: { display: true, text: '%', font: { size: fs(10) } },
           ticks: { font: { size: fs(10) }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
         x: { ticks: { font: { size: fs(10), weight: '700' } }, grid: { display: false } },
       },
@@ -201,14 +221,14 @@ function makeDualMetricCombo(canvasId, labels, barValues, barLabel, lineValues, 
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: LABEL_PADDING_TOP } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'bottom', align: 'center', reverse: false,
           padding: 12, labels: { boxWidth: 10, font: { size: fs(11), weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
         tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.formattedValue}%` } },
       },
       scales: {
-        y: { position: 'left', beginAtZero: true, title: { display: true, text: '%', font: { size: fs(10) } },
+        y: { position: 'left', beginAtZero: true, grace: Y_GRACE, title: { display: true, text: '%', font: { size: fs(10) } },
           ticks: { font: { size: fs(10) }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
         x: { ticks: { font: { size: fs(10), weight: '700' } }, grid: { display: false } },
       },
@@ -236,14 +256,14 @@ function makeDualLineChart(canvasId, labels, series1, label1, series2, label2, y
           font: { size: fs(10), weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
     ]},
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: LABEL_PADDING_TOP } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'bottom', align: 'center',
           padding: 12, labels: { boxWidth: 10, font: { size: fs(11), weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
         tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.formattedValue}%` } },
       },
       scales: {
-        y: { title: { display: true, text: yLabel, font: { size: fs(10) } }, ticks: { font: { size: fs(10) }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
+        y: { grace: Y_GRACE, title: { display: true, text: yLabel, font: { size: fs(10) } }, ticks: { font: { size: fs(10) }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
         x: { ticks: { font: { size: fs(10), weight: '700' } }, grid: { display: false } },
       },
     },
@@ -270,7 +290,7 @@ function makeSingleLineChart(canvasId, labels, values, label, yLabel, yOpts) {
         formatter: v => v != null ? round1_(v) + suffix : '' },
     }]},
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: LABEL_PADDING_TOP } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'bottom', align: 'center',
           padding: 12, labels: { boxWidth: 10, font: { size: fs(11), weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
@@ -279,6 +299,7 @@ function makeSingleLineChart(canvasId, labels, values, label, yLabel, yOpts) {
       scales: {
         y: {
           beginAtZero: !!yOpts.beginAtZero,
+          grace: Y_GRACE,
           title: { display: true, text: yLabel, font: { size: fs(10) } },
           ticks: { font: { size: fs(10) }, stepSize: yOpts.stepSize, callback: v => v + suffix },
           grid: { color: '#F0F4F8' },
@@ -313,14 +334,14 @@ function makeMultiLineChart(canvasId, labels, seriesList, yLabel, isPercent) {
     type: 'line',
     data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: LABEL_PADDING_TOP } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'bottom', align: 'center',
           padding: 12, labels: { boxWidth: 10, font: { size: fs(11), weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
         tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.formattedValue}${suffix}` } },
       },
       scales: {
-        y: { beginAtZero: true, title: { display: true, text: yLabel, font: { size: fs(10) } },
+        y: { beginAtZero: true, grace: Y_GRACE, title: { display: true, text: yLabel, font: { size: fs(10) } },
           ticks: { font: { size: fs(10) }, callback: v => v + suffix }, grid: { color: '#F0F4F8' } },
         x: { ticks: { font: { size: fs(10), weight: '700' } }, grid: { display: false } },
       },
@@ -349,6 +370,7 @@ function qcChartCardsHTML(cityMeta) {
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD% ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (hrs)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
+    <div class="chart-card span-2"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
     ${riderEfficiencyCardsHTML()}`;
 }
 
@@ -429,6 +451,12 @@ function renderQcCharts(cityMeta, rawSeries, period) {
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
     [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean));
   makeSingleLineChart('chartLmTat', labels, series.map(r => r.p80LmTat), 'P80 LM TAT (hrs)', 'Hours');
+  // QC Retry Rate — same construction as the Non-QC one: OFD orders on the
+  // left axis, retry % line on the right, retries/OFD in the tooltip.
+  makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0),
+    series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %', null,
+    items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`],
+    'OFD Orders');
 
   renderRiderEfficiencyCharts(labels, series, acceptancePartners);
 }
