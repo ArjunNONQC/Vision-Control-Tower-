@@ -130,37 +130,41 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
 // TRUE stacked bar (matches the "Long Tail Bifurcation %" reference style):
 // BBD% forms the base segment, Breach% stacks on top of it, each segment
 // labeled with its own value directly inside the bar.
-function makeNestedBarChart(canvasId, labels, breachValues, breachLabel, bddValues, bddLabel, baselineValue) {
+// Breach % as a bar, BBD % as a line, sharing one % axis. (Previously both
+// were stacked bar segments — moved BBD to a line per request, applied to
+// both QC and Non-QC since they share this one function.)
+function makeBreachBddChart(canvasId, labels, breachValues, breachLabel, bddValues, bddLabel, baselineValue) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
   const datasets = [
-    { type: 'bar', label: bddLabel, data: bddValues, backgroundColor: 'rgba(196,120,138,0.85)',
-      stack: 'breachStack', order: 2, maxBarThickness: 90, barPercentage: 0.85, categoryPercentage: 0.9,
-      datalabels: { display: 'auto', clamp: true, anchor: 'center', align: 'center', color: '#3A0E17',
-        font: { size: 10, weight: '700' }, formatter: v => v > 0.05 ? v.toFixed(1) + '%' : '' } },
-    { type: 'bar', label: breachLabel, data: breachValues, backgroundColor: COLOR.navyLine,
-      stack: 'breachStack', order: 1, maxBarThickness: 90, barPercentage: 0.85, categoryPercentage: 0.9,
-      datalabels: { display: 'auto', clamp: true, anchor: 'center', align: 'center', color: '#fff',
-        font: { size: 10, weight: '700' }, formatter: v => v > 0.05 ? v.toFixed(1) + '%' : '' } },
+    { type: 'bar', label: breachLabel, data: breachValues, backgroundColor: COLOR.bar, borderColor: COLOR.barBorder,
+      borderWidth: 1, borderRadius: 4, order: 2, maxBarThickness: 90, barPercentage: 0.85, categoryPercentage: 0.9,
+      datalabels: { display: 'auto', clamp: true, anchor: 'end', align: 'top', color: '#8B2F45',
+        font: { size: 10, weight: '600' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
+    { type: 'line', label: bddLabel, data: bddValues, borderColor: COLOR.navyLine, backgroundColor: 'rgba(74,20,32,0.08)',
+      borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.navyLine, pointBorderWidth: 2,
+      tension: 0.3, fill: false, order: 1,
+      datalabels: { display: 'auto', clamp: true, align: 'top', offset: 8, color: COLOR.navyLine,
+        font: { size: 11, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
   ];
   const baseline = baselineLineDataset(baselineValue, labels.length, 'y');
-  if (baseline) { baseline.order = 0; datasets.push(baseline); }
+  if (baseline) datasets.push(baseline);
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar', data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { display: true, position: 'bottom', align: 'center', reverse: true,
+        legend: { display: true, position: 'bottom', align: 'center', reverse: false,
           padding: 12, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
         tooltip: { ...TOOLTIP_STYLE, callbacks: {
           label: ctx => ctx.dataset.label === 'Baseline' ? ` Baseline: ${ctx.formattedValue}%` : ` ${ctx.dataset.label}: ${ctx.formattedValue}%`,
         } },
       },
       scales: {
-        y: { stacked: true, position: 'left', beginAtZero: true, title: { display: true, text: '%', font: { size: 10 } },
+        y: { position: 'left', beginAtZero: true, title: { display: true, text: '%', font: { size: 10 } },
           ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
-        x: { stacked: true, ticks: { font: { size: 10 } }, grid: { display: false } },
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
       },
     },
   });
@@ -264,6 +268,45 @@ function makeSingleLineChart(canvasId, labels, values, label, yLabel) {
   });
 }
 
+// Generic 1-to-N line chart, one distinct color per series. Used for every
+// new Rider Efficiency metric (1-2 lines each) and the 3P Acceptance Rate
+// chart (one line per delivery partner, count varies).
+const MULTI_LINE_PALETTE = [COLOR.navyLine, COLOR.singleLine, '#2980B9', '#1E8449', '#D68910', '#8E44AD', '#16A085'];
+
+function makeMultiLineChart(canvasId, labels, seriesList, yLabel, isPercent) {
+  if (charts[canvasId]) charts[canvasId].destroy();
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const suffix = isPercent ? '%' : '';
+  const datasets = seriesList.map((s, i) => {
+    const color = MULTI_LINE_PALETTE[i % MULTI_LINE_PALETTE.length];
+    return {
+      label: s.label, data: s.data, borderColor: color, backgroundColor: 'transparent',
+      borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: color, pointBorderWidth: 2,
+      tension: 0.3, fill: false,
+      datalabels: { display: 'auto', clamp: true, align: i % 2 === 0 ? 'top' : 'bottom', offset: 6, color,
+        font: { size: 10, weight: '700' }, formatter: v => v != null ? round1_(v) + suffix : '' },
+    };
+  });
+  charts[canvasId] = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'bottom', align: 'center',
+          padding: 12, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
+        tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.formattedValue}${suffix}` } },
+      },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: yLabel, font: { size: 10 } },
+          ticks: { font: { size: 10 }, callback: v => v + suffix }, grid: { color: '#F0F4F8' } },
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+      },
+    },
+  });
+}
+
 // ======================= CARD LAYOUTS PER SERVICE =======================
 function nonQcChartCardsHTML(cityMeta) {
   return `
@@ -285,7 +328,7 @@ function qcChartCardsHTML(cityMeta) {
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD% ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (hrs)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
-    <div class="chart-card span-2"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>`;
+    ${riderEfficiencyCardsHTML()}`;
 }
 
 function storeChartCardsHTML() {
@@ -294,7 +337,23 @@ function storeChartCardsHTML() {
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach %</h3><div class="chart-canvas-wrap"><canvas id="chartBreachPlain"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD% <span class="baseline-legend"><span class="baseline-swatch"></span>Baseline 40.0%</span></h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % <span class="baseline-legend"><span class="baseline-swatch"></span>Baseline 4.0%</span></h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (hrs)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>`;
+    <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (hrs)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
+    ${riderEfficiencyCardsHTML()}`;
+}
+
+// Shared by both the QC city page and the store page — new rider-efficiency
+// and 3P-partner-acceptance charts, same card markup either way.
+function riderEfficiencyCardsHTML() {
+  return `
+    <div class="section-divider">Rider Efficiency</div>
+    <div class="chart-card"><h3><span class="card-dot dot-tat"></span>Active Hrs</h3><div class="chart-canvas-wrap"><canvas id="chartActiveHrs"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-tat"></span>Idle Hrs</h3><div class="chart-canvas-wrap"><canvas id="chartIdleHrs"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-share"></span>Efficiency Per Day / Per Hour</h3><div class="chart-canvas-wrap"><canvas id="chartEfficiency"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Active Riders</h3><div class="chart-canvas-wrap"><canvas id="chartActiveRiders"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>Mg Eligible %</h3><div class="chart-canvas-wrap"><canvas id="chartMgEligible"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-cancel"></span>% Not Hitting Upper Threshold</h3><div class="chart-canvas-wrap"><canvas id="chartUpperThreshold"></canvas></div></div>
+    <div class="section-divider">3P Partner Acceptance</div>
+    <div class="chart-card span-2"><h3><span class="card-dot dot-share"></span>Acceptance Rate by Partner</h3><div class="chart-canvas-wrap"><canvas id="chartAcceptance"></canvas></div></div>`;
 }
 
 function renderNonQcCharts(cityMeta, rawSeries, period) {
@@ -304,7 +363,7 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
   const labels = series.map(r => period === 'WoW' ? fmtWeekLabel(r.date) : fmtDayLabel(r.date));
   const orders = series.map(r => r.orders);
 
-  makeNestedBarChart('chartBreachBdd', labels,
+  makeBreachBddChart('chartBreachBdd', labels,
     series.map(r => round1_(r.breachPct * 100)), 'Breach %',
     series.map(r => round1_(r.bddPct * 100)), 'BBD %',
     cityMeta.overallBreachBaseline);
@@ -322,8 +381,11 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
 }
 
 function renderQcCharts(cityMeta, rawSeries, period) {
+  const acceptancePartners = cityMeta.acceptancePartners || [];
+  const acceptFields = acceptancePartners.map(p => 'accept__' + p);
   const pctFields = ['breachPct','breachWithTolPct','bbdBreachPct','ltPct','dmSharePct','tpSharePct'];
-  const avgFields = ['p80LmTat'];
+  const avgFields = ['p80LmTat','avgActiveHrs','avgIdleHrs','efficiencyPerDay','efficiencyPerHour',
+    'activeRiders','mgEligiblePct','pctNotHittingUpperThreshold', ...acceptFields];
   const series = period === 'WoW' ? toWeekly(rawSeries, pctFields, avgFields) : rawSeries;
   const labels = series.map(r => period === 'WoW' ? fmtWeekLabel(r.date) : fmtDayLabel(r.date));
   const orders = series.map(r => r.orders);
@@ -332,20 +394,46 @@ function renderQcCharts(cityMeta, rawSeries, period) {
     series.map(r => r.dmSharePct != null ? round1_(r.dmSharePct * 100) : null), 'Inhouse Share %',
     series.map(r => r.tpSharePct != null ? round1_(r.tpSharePct * 100) : null), '3P Share %', '%');
   makeComboChart('chartBreachPlain', labels, orders, series.map(r => round1_(r.breachPct * 100)), 'Breach %', null);
-  makeNestedBarChart('chartBreachBdd', labels,
+  makeBreachBddChart('chartBreachBdd', labels,
     series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach with Tol %',
     series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %',
     cityMeta.overallBreachBaseline);
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
     [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean));
   makeSingleLineChart('chartLmTat', labels, series.map(r => r.p80LmTat), 'P80 LM TAT (hrs)', 'Hours');
-  makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %', null,
-    items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`]);
+
+  renderRiderEfficiencyCharts(labels, series, acceptancePartners);
 }
 
-function renderStoreCharts(rawSeries, period) {
+// Shared by both the QC city page and the store page.
+function renderRiderEfficiencyCharts(labels, series, acceptancePartners) {
+  makeMultiLineChart('chartActiveHrs', labels,
+    [{ label: 'Avg Active Hrs', data: series.map(r => r.avgActiveHrs != null ? round1_(r.avgActiveHrs) : null) }], 'Hours', false);
+  makeMultiLineChart('chartIdleHrs', labels,
+    [{ label: 'Avg Idle Hrs', data: series.map(r => r.avgIdleHrs != null ? round1_(r.avgIdleHrs) : null) }], 'Hours', false);
+  makeMultiLineChart('chartEfficiency', labels, [
+    { label: 'Efficiency Per Day', data: series.map(r => r.efficiencyPerDay != null ? round1_(r.efficiencyPerDay) : null) },
+    { label: 'Efficiency Per Hour', data: series.map(r => r.efficiencyPerHour != null ? round1_(r.efficiencyPerHour) : null) },
+  ], 'Efficiency', false);
+  makeMultiLineChart('chartActiveRiders', labels,
+    [{ label: 'Active Riders', data: series.map(r => r.activeRiders != null ? round1_(r.activeRiders) : null) }], 'Riders', false);
+  makeMultiLineChart('chartMgEligible', labels,
+    [{ label: 'Mg Eligible %', data: series.map(r => r.mgEligiblePct != null ? round1_(r.mgEligiblePct * 100) : null) }], '%', true);
+  makeMultiLineChart('chartUpperThreshold', labels,
+    [{ label: '% Not Hitting Upper Threshold', data: series.map(r => r.pctNotHittingUpperThreshold != null ? round1_(r.pctNotHittingUpperThreshold * 100) : null) }], '%', true);
+  makeMultiLineChart('chartAcceptance', labels,
+    acceptancePartners.map(p => ({
+      label: p,
+      data: series.map(r => r['accept__' + p] != null ? round1_(r['accept__' + p] * 100) : null),
+    })), '%', true);
+}
+
+function renderStoreCharts(rawSeries, period, acceptancePartners) {
+  acceptancePartners = acceptancePartners || [];
+  const acceptFields = acceptancePartners.map(p => 'accept__' + p);
   const pctFields = ['breachPct','breachWithTolPct','bbdBreachPct','ltPct','dmSharePct','tpSharePct'];
-  const avgFields = ['p80LmTat'];
+  const avgFields = ['p80LmTat','avgActiveHrs','avgIdleHrs','efficiencyPerDay','efficiencyPerHour',
+    'activeRiders','mgEligiblePct','pctNotHittingUpperThreshold', ...acceptFields];
   const series = period === 'WoW' ? toWeekly(rawSeries, pctFields, avgFields) : rawSeries;
   const labels = series.map(r => period === 'WoW' ? fmtWeekLabel(r.date) : fmtDayLabel(r.date));
   const orders = series.map(r => r.orders);
@@ -354,13 +442,15 @@ function renderStoreCharts(rawSeries, period) {
     series.map(r => r.dmSharePct != null ? round1_(r.dmSharePct * 100) : null), 'Inhouse Share %',
     series.map(r => r.tpSharePct != null ? round1_(r.tpSharePct * 100) : null), '3P Share %', '%');
   makeComboChart('chartBreachPlain', labels, orders, series.map(r => round1_(r.breachPct * 100)), 'Breach %', null);
-  makeNestedBarChart('chartBreachBdd', labels,
+  makeBreachBddChart('chartBreachBdd', labels,
     series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach with Tol %',
     series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %',
     0.40);
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
     [baselineLineDataset(0.04, series.length)].filter(Boolean));
   makeSingleLineChart('chartLmTat', labels, series.map(r => r.p80LmTat), 'P80 LM TAT (hrs)', 'Hours');
+
+  renderRiderEfficiencyCharts(labels, series, acceptancePartners);
 }
 
 // ======================= STAT PANELS =======================
@@ -476,12 +566,16 @@ function schemaWarningHTML(schemaWarnings) {
   const sdd = schemaWarnings.sddFasterMissingColumns || [];
   const canc = schemaWarnings.cancellationNonQcMissingColumns || [];
   const noBaseline = schemaWarnings.missingBaselineCities || [];
-  if (!nq.length && !qc.length && !sdd.length && !canc.length && !noBaseline.length) return '';
+  const eff = schemaWarnings.qcEfficiencyMissingColumns || [];
+  const accept = schemaWarnings.qc3pAcceptanceMissingColumns || [];
+  if (!nq.length && !qc.length && !sdd.length && !canc.length && !noBaseline.length && !eff.length && !accept.length) return '';
   const parts = [];
   if (nq.length) parts.push(`Dump NONQC: couldn't find column(s) for ${nq.join(', ')}`);
   if (qc.length) parts.push(`Dump QC: couldn't find column(s) for ${qc.join(', ')}`);
   if (sdd.length) parts.push(`SDD & Faster %: couldn't find column(s) for ${sdd.join(', ')}`);
   if (canc.length) parts.push(`Cancellation Non-QC: couldn't find column(s) for ${canc.join(', ')}`);
+  if (eff.length) parts.push(`QC EFFICIENCY: couldn't find column(s) for ${eff.join(', ')}`);
+  if (accept.length) parts.push(`QC 3P Acceptance Rate: couldn't find column(s) for ${accept.join(', ')}`);
   if (noBaseline.length) parts.push(`Base Config: no matching row for ${noBaseline.join(', ')} — their Breach % baseline won't be drawn until the city name in Base Config exactly matches Dump NONQC`);
   return `<div class="schema-warning">⚠ Sheet column mismatch — ${parts.join(' · ')}. Those fields are reading as 0 until the header names match.</div>`;
 }
@@ -575,13 +669,14 @@ function storeListHTML(storesPayload) {
       <span>${trendDirectionHTML(s.trend)}</span>
       <span>${s.totalOrders.toLocaleString()}</span>
       <span>${(s.breachWithTolPct*100).toFixed(1)}%</span>
-      <span>${(s.orderSharePct*100).toFixed(1)}%</span>
+      <span>${s.dmSharePct != null ? (s.dmSharePct*100).toFixed(1) + '%' : '—'}</span>
+      <span>${s.tpSharePct != null ? (s.tpSharePct*100).toFixed(1) + '%' : '—'}</span>
     </div>`).join('');
   return `
     <div class="section-label">Stores in ${storesPayload.city} <span style="font-weight:500;text-transform:none;">(as of ${fmtDayLabel(storesPayload.asOf)})</span></div>
     <div class="store-list">
       <div class="store-row store-header">
-        <span>Store</span><span>Trend</span><span>Total Orders</span><span>Breach %</span><span>Order Share</span>
+        <span>Store</span><span>Trend</span><span>Total Orders</span><span>Breach %</span><span>DM Share</span><span>3P Share</span>
       </div>
       ${rows}
     </div>`;
