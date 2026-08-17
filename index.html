@@ -55,7 +55,7 @@
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=23"></script>
+<script src="citycharts.js?v=24"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -112,7 +112,7 @@ function setActive(group, btn) {
 function fmtPct(v) { return (v * 100).toFixed(1) + '%'; }
 
 function metricLabel(m) {
-  return m === 'Overall Breach' ? 'Overall Breach' : 'Long Tail (LM Induced)';
+  return m === 'Overall Breach' ? 'Overall Breach' : 'Long Tail';
 }
 
 function renderBreachCard(c) {
