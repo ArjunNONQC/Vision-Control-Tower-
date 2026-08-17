@@ -38,13 +38,14 @@ const STORE_CODE = params.get('store');
 const CITY_HINT = params.get('city');
 let period = 'DoD';
 let rawSeries = null;
+let acceptancePartners = [];
 
 document.getElementById('periodToggle').addEventListener('click', (e) => {
   if (e.target.tagName !== 'BUTTON') return;
   [...e.currentTarget.children].forEach(b => b.classList.remove('active'));
   e.target.classList.add('active');
   period = e.target.dataset.val;
-  renderStoreCharts(rawSeries, period);
+  renderStoreCharts(rawSeries, period, acceptancePartners);
 });
 
 async function load(force) {
@@ -67,11 +68,12 @@ async function doRefresh() {
 
 function renderStoreData(data) {
   rawSeries = data.series;
+  acceptancePartners = data.acceptancePartners || [];
   document.getElementById('storeTitle').textContent = `${data.storeCode} — ${data.city} (QC)`;
   document.getElementById('backToCity').innerHTML =
     `<a class="nav-btn" href="city.html?city=${encodeURIComponent(data.city)}&service=QC" style="margin-right:8px;">← Back to ${data.city}</a>`;
   document.getElementById('chartGrid').innerHTML = storeChartCardsHTML();
-  renderStoreCharts(rawSeries, period);
+  renderStoreCharts(rawSeries, period, acceptancePartners);
 }
 load();
 </script>
