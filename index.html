@@ -6,6 +6,8 @@
 <title>Vision — City Tracker</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
 <link rel="stylesheet" href="style.css?v=14" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
 <body>
 
@@ -42,6 +44,7 @@
 <div class="container">
   <div id="diagBanner"></div>
   <div id="panIndiaAgeing"></div>
+  <div id="panIndiaAcceptance"></div>
   <div class="section-label">Needs attention</div>
   <div id="breachGrid" class="card-grid"><div class="loading">Loading…</div></div>
 
@@ -177,6 +180,8 @@ function renderHomeData(data) {
     document.getElementById('panIndiaAgeing').innerHTML =
       panIndiaAgeingBarHTML(data.ageing, data.service, data.panIndia);
 
+    renderPanIndiaAcceptance(data);
+
     const grid = document.getElementById('breachGrid');
     if (!data.cities.length) {
       grid.innerHTML = '<div class="empty-state">No breached cities in this view.</div>';
@@ -205,6 +210,27 @@ function startBackgroundPrefetch() {
   if (prefetchStarted) return; // only ever run once per session, not on every toggle click
   prefetchStarted = true;
   setTimeout(() => prefetchAllCitiesAndStores(), 300); // let the home page finish painting first
+}
+
+// 3P Acceptance Rate is a QC-only concept (Non-QC has no delivery partner
+// network) — hidden entirely for Non-QC. Always daily grain, independent of
+// the DoD/WoW toggle, since acceptance rate has no order-count to weight a
+// weekly bucket by (unlike every other WoW-aware chart in this app).
+function renderPanIndiaAcceptance(data) {
+  const holder = document.getElementById('panIndiaAcceptance');
+  const ap = data.acceptancePanIndia;
+  if (data.service !== 'QC' || !ap || !ap.partners.length) { holder.innerHTML = ''; return; }
+  holder.innerHTML = `
+    <div class="chart-card" style="margin: 6px 0 20px;">
+      <h3><span class="card-dot dot-share"></span>3P Partner Acceptance Rate — Pan India</h3>
+      <div class="chart-canvas-wrap"><canvas id="chartAcceptancePanIndia"></canvas></div>
+    </div>`;
+  const labels = ap.dates.map(d => fmtDayLabel(d));
+  makeMultiLineChart('chartAcceptancePanIndia', labels,
+    ap.partners.map(p => ({
+      label: p,
+      data: ap.series[p].map(v => v != null ? round1_(v * 100) : null),
+    })), '%', true);
 }
 
 initLock();
