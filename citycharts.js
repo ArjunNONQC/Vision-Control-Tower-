@@ -356,11 +356,13 @@ function nonQcChartCardsHTML(cityMeta) {
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-cancel"></span>Cancellation %</h3><div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>SDD & Faster % Inhouse + 3PL</h3><div class="chart-canvas-wrap"><canvas id="chartSddFaster"></canvas></div></div>
-    <div class="chart-card span-2"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-nps"></span>NPS (7d rolling)</h3><div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div></div>
     <div class="section-divider">Queue-Level TAT in Hrs (P80)</div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>Overall TAT</h3><div class="chart-canvas-wrap"><canvas id="chartTatOverall"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>SQ &rarr; MDQ</h3><div class="chart-canvas-wrap"><canvas id="chartTatSqMdq"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-tat"></span>MDQ &rarr; Del</h3><div class="chart-canvas-wrap"><canvas id="chartTatMdqDel"></canvas></div></div>`;
+    <div class="chart-card"><h3><span class="card-dot dot-tat"></span>MDQ &rarr; Del</h3><div class="chart-canvas-wrap"><canvas id="chartTatMdqDel"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-tat"></span>Placed &rarr; ETA</h3><div class="chart-canvas-wrap"><canvas id="chartTatPlacedEta"></canvas></div></div>`;
 }
 
 function qcChartCardsHTML(cityMeta) {
@@ -370,7 +372,8 @@ function qcChartCardsHTML(cityMeta) {
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD% ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (hrs)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
-    <div class="chart-card span-2"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-nps"></span>NPS (7d rolling)</h3><div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div></div>
     ${riderEfficiencyCardsHTML()}`;
 }
 
@@ -428,6 +431,24 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
   makeSingleLineChart('chartTatOverall', labels, series.map(r => r.overallTat), 'Overall TAT (hrs)', 'Hours', tatYOpts);
   makeSingleLineChart('chartTatSqMdq', labels, series.map(r => r.sqToMdq), 'SQ\u2192MDQ (hrs)', 'Hours', tatYOpts);
   makeSingleLineChart('chartTatMdqDel', labels, series.map(r => r.mdqToDel), 'MDQ\u2192Del (hrs)', 'Hours', tatYOpts);
+  // Placed → ETA sits with the queue-level TAT charts and uses the same axis
+  // rules so all four read on a comparable scale.
+  makeSingleLineChart('chartTatPlacedEta', labels, series.map(r => r.p80PlacedToEta ?? null),
+    'Placed\u2192ETA (hrs)', 'Hours', tatYOpts);
+
+  renderNpsChart(rawSeries, period);
+}
+
+// NPS is already a 7-day ROLLING score at source, so re-bucketing it into weeks
+// under the WoW toggle would average an average. It always renders from the raw
+// daily series regardless of the toggle — the value on any given day already
+// carries a week of history. Nulls are preserved so a city with no score that
+// day shows a gap rather than a plunge to zero.
+function renderNpsChart(rawSeries, period) {
+  const labels = rawSeries.map(r => fmtDayLabel(r.date));
+  makeMultiLineChart('chartNps', labels,
+    [{ label: 'NPS (7d rolling)', data: rawSeries.map(r => r.nps != null ? round1_(r.nps) : null) }],
+    'NPS', false);
 }
 
 function renderQcCharts(cityMeta, rawSeries, period) {
@@ -457,6 +478,7 @@ function renderQcCharts(cityMeta, rawSeries, period) {
     series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %', null,
     items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`],
     'OFD Orders');
+  renderNpsChart(rawSeries, period);
 
   renderRiderEfficiencyCharts(labels, series, acceptancePartners);
 }
@@ -624,7 +646,9 @@ function schemaWarningHTML(schemaWarnings) {
   const noBaseline = schemaWarnings.missingBaselineCities || [];
   const eff = schemaWarnings.qcEfficiencyMissingColumns || [];
   const accept = schemaWarnings.qc3pAcceptanceMissingColumns || [];
-  if (!nq.length && !qc.length && !sdd.length && !canc.length && !noBaseline.length && !eff.length && !accept.length) return '';
+  const eta = schemaWarnings.nonQcEtaMissingColumns || [];
+  const nps = schemaWarnings.npsMissingColumns || [];
+  if (!nq.length && !qc.length && !sdd.length && !canc.length && !noBaseline.length && !eff.length && !accept.length && !eta.length && !nps.length) return '';
   const parts = [];
   if (nq.length) parts.push(`Dump NONQC: couldn't find column(s) for ${nq.join(', ')}`);
   if (qc.length) parts.push(`Dump QC: couldn't find column(s) for ${qc.join(', ')}`);
@@ -632,6 +656,8 @@ function schemaWarningHTML(schemaWarnings) {
   if (canc.length) parts.push(`Cancellation Non-QC: couldn't find column(s) for ${canc.join(', ')}`);
   if (eff.length) parts.push(`QC EFFICIENCY: couldn't find column(s) for ${eff.join(', ')}`);
   if (accept.length) parts.push(`QC 3P Acceptance Rate: couldn't find column(s) for ${accept.join(', ')}`);
+  if (eta.length) parts.push(`NON-QC Eta: couldn't find column(s) for ${eta.join(', ')}`);
+  if (nps.length) parts.push(`NPS: couldn't find column(s) for ${nps.join(', ')}`);
   if (noBaseline.length) parts.push(`Base Config: no matching row for ${noBaseline.join(', ')} — their Breach % baseline won't be drawn until the city name in Base Config exactly matches Dump NONQC`);
   return `<div class="schema-warning">⚠ Sheet column mismatch — ${parts.join(' · ')}. Those fields are reading as 0 until the header names match.</div>`;
 }
@@ -725,6 +751,7 @@ function storeListHTML(storesPayload) {
       <span>${trendDirectionHTML(s.trend)}</span>
       <span>${s.totalOrders.toLocaleString()}</span>
       <span>${(s.breachWithTolPct*100).toFixed(1)}%</span>
+      <span>${s.ltPct != null ? (s.ltPct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.dmSharePct != null ? (s.dmSharePct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.tpSharePct != null ? (s.tpSharePct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.activeRiders != null ? Number(s.activeRiders).toLocaleString() : '—'}</span>
@@ -734,8 +761,38 @@ function storeListHTML(storesPayload) {
     <div class="section-label">Stores in ${storesPayload.city} <span style="font-weight:500;text-transform:none;">(as of ${fmtDayLabel(storesPayload.asOf)})</span></div>
     <div class="store-list">
       <div class="store-row store-header">
-        <span>Store</span><span>Trend</span><span>Total Orders</span><span>Breach %</span><span>DM Share</span><span>3P Share</span><span>Active Riders</span><span>TAT (hrs)</span>
+        <span>Store</span><span>Trend</span><span>Total Orders</span><span>Breach %</span><span>Long Tail %</span><span>DM Share</span><span>3P Share</span><span>Active Riders</span><span>TAT (hrs)</span>
       </div>
+      ${rows}
+    </div>`;
+}
+
+// ======================= PAN INDIA CITY CARD =======================
+// A card for the national rollup that sits alongside the per-city cards and
+// opens the same city-detail page, so Pan India is reachable for every metric
+// rather than only the summary bar. It deliberately does NOT use the breach
+// card's red/amber styling: Pan India has no single baseline to breach, so
+// showing it as "as per trend" or "breached" would be inventing a verdict.
+// Metrics come from the payload's own pan-India block, which is read from the
+// sheet's pre-aggregated rows.
+function panIndiaCardHTML(data) {
+  if (!data.panIndiaAvailable || !data.panIndia) return '';
+  const p = data.panIndia;
+  const pct = v => v != null ? (v * 100).toFixed(1) + '%' : '—';
+  const rows = [
+    ['Orders', p.orders != null ? p.orders.toLocaleString() : '—'],
+    ['Breach %', pct(p.breachPct)],
+    ['Long Tail %', pct(p.ltPct)],
+    ['Retry %', pct(p.retryPct)],
+  ].map(([name, val]) => `
+      <div class="metric-row">
+        <span class="metric-name">${name}</span>
+        <span class="metric-vals"><span>${val}</span></span>
+      </div>`).join('');
+  return `
+    <div class="city-card pan-india-card" onclick="goToCity('Pan India','${data.service}')">
+      <div class="city-name">🇮🇳 Pan India <span class="pan-india-chip">All cities</span></div>
+      <div class="driven-by">National rollup — ${data.service} · ${data.period}</div>
       ${rows}
     </div>`;
 }
