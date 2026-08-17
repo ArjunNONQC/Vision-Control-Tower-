@@ -37,6 +37,12 @@ function fmtWeekLabel(mondayStr) {
 }
 function round1_(n) { return Math.round(n * 10) / 10; }
 
+// All chart typography is scaled through fs() so the whole dashboard's graph
+// font size moves together from one place. Currently +10% over the original
+// sizes. Purely presentational — never touches a data value.
+const FONT_SCALE = 1.1;
+function fs(n) { return Math.round(n * FONT_SCALE * 10) / 10; }
+
 function toWeekly(series, pctFields, avgFields) {
   const weeks = {};
   series.forEach(row => {
@@ -84,23 +90,27 @@ function baselineLineDataset(value, len, yAxisID) {
 const TOOLTIP_STYLE = {
   backgroundColor: 'rgba(74,20,32,0.96)', titleColor: '#fff', bodyColor: '#F5E6E9',
   padding: 10, cornerRadius: 8, displayColors: true, boxPadding: 4,
-  titleFont: { size: 12, weight: '700' }, bodyFont: { size: 11.5 },
+  titleFont: { size: fs(12), weight: '700' }, bodyFont: { size: fs(11.5) },
 };
 
 // Bars = order volume (left axis) . Line = one % metric (right axis)
-function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLineDatasets, tooltipExtra) {
+// ordersLabel (optional) renames the bar series + its left axis for charts
+// where the bars aren't plain delivered orders (e.g. Retry Rate plots OFD
+// orders). Defaults to 'Orders' so every existing caller is unchanged.
+function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLineDatasets, tooltipExtra, ordersLabel) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
+  ordersLabel = ordersLabel || 'Orders';
   const datasets = [
-    { type: 'bar', label: 'Orders', yAxisID: 'yOrders', data: orders, backgroundColor: COLOR.bar,
+    { type: 'bar', label: ordersLabel, yAxisID: 'yOrders', data: orders, backgroundColor: COLOR.bar,
       borderColor: COLOR.barBorder, borderWidth: 1, borderRadius: 4, order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
       datalabels: { display: false } },
     { type: 'line', label: pctLabel, yAxisID: 'yPct', data: pctValues, borderColor: COLOR.navyLine,
       backgroundColor: 'rgba(74,20,32,0.08)', borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff',
       pointBorderColor: COLOR.navyLine, pointBorderWidth: 2, tension: 0.3, fill: false, order: 1,
       datalabels: { display: 'auto', clamp: true, align: ctx => ctx.dataIndex % 2 === 0 ? 'top' : 'bottom',
-        offset: 8, color: COLOR.navyLine, font: { size: 11, weight: '700' },
+        offset: 8, color: COLOR.navyLine, font: { size: fs(11), weight: '700' },
         formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
   ];
   if (extraLineDatasets) datasets.push(...extraLineDatasets);
@@ -110,18 +120,18 @@ function makeComboChart(canvasId, labels, orders, pctValues, pctLabel, extraLine
       responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'bottom', align: 'center', reverse: false,
-          padding: 12, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
+          padding: 12, labels: { boxWidth: 10, font: { size: fs(11), weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
         tooltip: { ...TOOLTIP_STYLE, callbacks: {
           label: ctx => ` ${ctx.dataset.label}: ${ctx.dataset.yAxisID === 'yPct' ? ctx.formattedValue + '%' : ctx.formattedValue}`,
           afterBody: tooltipExtra,
         } },
       },
       scales: {
-        yOrders: { position: 'left', beginAtZero: true, title: { display: true, text: 'Orders', font: { size: 10 } },
-          ticks: { font: { size: 10 } }, grid: { display: false } },
-        yPct: { position: 'right', beginAtZero: true, title: { display: true, text: '%', font: { size: 10 } },
-          ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
-        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        yOrders: { position: 'left', beginAtZero: true, title: { display: true, text: ordersLabel, font: { size: fs(10) } },
+          ticks: { font: { size: fs(10) } }, grid: { display: false } },
+        yPct: { position: 'right', beginAtZero: true, title: { display: true, text: '%', font: { size: fs(10) } },
+          ticks: { font: { size: fs(10) }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
+        x: { ticks: { font: { size: fs(10), weight: '700' } }, grid: { display: false } },
       },
     },
   });
@@ -141,12 +151,12 @@ function makeBreachBddChart(canvasId, labels, breachValues, breachLabel, bddValu
     { type: 'bar', label: breachLabel, data: breachValues, backgroundColor: COLOR.bar, borderColor: COLOR.barBorder,
       borderWidth: 1, borderRadius: 4, order: 2, maxBarThickness: 90, barPercentage: 0.85, categoryPercentage: 0.9,
       datalabels: { display: 'auto', clamp: true, anchor: 'end', align: 'top', color: '#8B2F45',
-        font: { size: 10, weight: '600' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
+        font: { size: fs(10), weight: '600' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
     { type: 'line', label: bddLabel, data: bddValues, borderColor: COLOR.navyLine, backgroundColor: 'rgba(74,20,32,0.08)',
       borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.navyLine, pointBorderWidth: 2,
       tension: 0.3, fill: false, order: 1,
       datalabels: { display: 'auto', clamp: true, align: 'top', offset: 8, color: COLOR.navyLine,
-        font: { size: 11, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
+        font: { size: fs(11), weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
   ];
   const baseline = baselineLineDataset(baselineValue, labels.length, 'y');
   if (baseline) datasets.push(baseline);
@@ -156,15 +166,15 @@ function makeBreachBddChart(canvasId, labels, breachValues, breachLabel, bddValu
       responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'bottom', align: 'center', reverse: false,
-          padding: 12, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
+          padding: 12, labels: { boxWidth: 10, font: { size: fs(11), weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
         tooltip: { ...TOOLTIP_STYLE, callbacks: {
           label: ctx => ctx.dataset.label === 'Baseline' ? ` Baseline: ${ctx.formattedValue}%` : ` ${ctx.dataset.label}: ${ctx.formattedValue}%`,
         } },
       },
       scales: {
-        y: { position: 'left', beginAtZero: true, title: { display: true, text: '%', font: { size: 10 } },
-          ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
-        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { position: 'left', beginAtZero: true, title: { display: true, text: '%', font: { size: fs(10) } },
+          ticks: { font: { size: fs(10) }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
+        x: { ticks: { font: { size: fs(10), weight: '700' } }, grid: { display: false } },
       },
     },
   });
@@ -179,12 +189,12 @@ function makeDualMetricCombo(canvasId, labels, barValues, barLabel, lineValues, 
     { type: 'bar', label: barLabel, data: barValues, backgroundColor: COLOR.bar, borderColor: COLOR.barBorder,
       borderWidth: 1, borderRadius: 4, order: 2, maxBarThickness: 56, barPercentage: 0.55, categoryPercentage: 0.65,
       datalabels: { display: 'auto', clamp: true, anchor: 'end', align: 'top', color: '#8B2F45',
-        font: { size: 10, weight: '600' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
+        font: { size: fs(10), weight: '600' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
     { type: 'line', label: lineLabel, data: lineValues, borderColor: COLOR.navyLine, backgroundColor: 'rgba(74,20,32,0.08)',
       borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.navyLine, pointBorderWidth: 2,
       tension: 0.3, fill: false, order: 1,
       datalabels: { display: 'auto', clamp: true, align: 'top', offset: 8, color: COLOR.navyLine,
-        font: { size: 11, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
+        font: { size: fs(11), weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
   ];
   const baseline = baselineLineDataset(baselineValue, labels.length);
   if (baseline) datasets.push(baseline);
@@ -194,13 +204,13 @@ function makeDualMetricCombo(canvasId, labels, barValues, barLabel, lineValues, 
       responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'bottom', align: 'center', reverse: false,
-          padding: 12, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
+          padding: 12, labels: { boxWidth: 10, font: { size: fs(11), weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
         tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.formattedValue}%` } },
       },
       scales: {
-        y: { position: 'left', beginAtZero: true, title: { display: true, text: '%', font: { size: 10 } },
-          ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
-        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { position: 'left', beginAtZero: true, title: { display: true, text: '%', font: { size: fs(10) } },
+          ticks: { font: { size: fs(10) }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
+        x: { ticks: { font: { size: fs(10), weight: '700' } }, grid: { display: false } },
       },
     },
   });
@@ -218,32 +228,37 @@ function makeDualLineChart(canvasId, labels, series1, label1, series2, label2, y
         borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.singleLine, pointBorderWidth: 2,
         tension: 0.3, fill: false,
         datalabels: { display: 'auto', clamp: true, align: 'top', offset: 6, color: COLOR.singleLine,
-          font: { size: 10, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
+          font: { size: fs(10), weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
       { label: label2, data: series2, borderColor: COLOR.secondLine, backgroundColor: 'transparent',
         borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.secondLine, pointBorderWidth: 2,
         tension: 0.3, fill: false,
         datalabels: { display: 'auto', clamp: true, align: 'bottom', offset: 6, color: COLOR.secondLine,
-          font: { size: 10, weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
+          font: { size: fs(10), weight: '700' }, formatter: v => v > 0 ? v.toFixed(1) + '%' : '' } },
     ]},
     options: {
       responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'bottom', align: 'center',
-          padding: 12, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
+          padding: 12, labels: { boxWidth: 10, font: { size: fs(11), weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
         tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.formattedValue}%` } },
       },
       scales: {
-        y: { title: { display: true, text: yLabel, font: { size: 10 } }, ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
-        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { title: { display: true, text: yLabel, font: { size: fs(10) } }, ticks: { font: { size: fs(10) }, callback: v => v + '%' }, grid: { color: '#F0F4F8' } },
+        x: { ticks: { font: { size: fs(10), weight: '700' } }, grid: { display: false } },
       },
     },
   });
 }
 
-function makeSingleLineChart(canvasId, labels, values, label, yLabel) {
+// yOpts (optional): { beginAtZero, stepSize, suffix }. Used by the Queue-Level
+// TAT charts, which are pinned to start at 0 with a fixed 10-unit tick gap so
+// the three of them stay visually comparable to each other.
+function makeSingleLineChart(canvasId, labels, values, label, yLabel, yOpts) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
+  yOpts = yOpts || {};
+  const suffix = yOpts.suffix || '';
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: { labels, datasets: [{
@@ -251,18 +266,24 @@ function makeSingleLineChart(canvasId, labels, values, label, yLabel) {
       borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: COLOR.singleLine,
       pointBorderWidth: 2, fill: true, tension: 0.3,
       datalabels: { display: 'auto', clamp: true, align: ctx => ctx.dataIndex % 2 === 0 ? 'top' : 'bottom',
-        offset: 6, color: COLOR.singleLine, font: { size: 10, weight: '700' } },
+        offset: 6, color: COLOR.singleLine, font: { size: fs(10), weight: '700' },
+        formatter: v => v != null ? round1_(v) + suffix : '' },
     }]},
     options: {
       responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'bottom', align: 'center',
-          padding: 12, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
-        tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.formattedValue}` } },
+          padding: 12, labels: { boxWidth: 10, font: { size: fs(11), weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
+        tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.formattedValue}${suffix}` } },
       },
       scales: {
-        y: { title: { display: true, text: yLabel, font: { size: 10 } }, ticks: { font: { size: 10 } }, grid: { color: '#F0F4F8' } },
-        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: {
+          beginAtZero: !!yOpts.beginAtZero,
+          title: { display: true, text: yLabel, font: { size: fs(10) } },
+          ticks: { font: { size: fs(10) }, stepSize: yOpts.stepSize, callback: v => v + suffix },
+          grid: { color: '#F0F4F8' },
+        },
+        x: { ticks: { font: { size: fs(10), weight: '700' } }, grid: { display: false } },
       },
     },
   });
@@ -285,7 +306,7 @@ function makeMultiLineChart(canvasId, labels, seriesList, yLabel, isPercent) {
       borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: color, pointBorderWidth: 2,
       tension: 0.3, fill: false,
       datalabels: { display: 'auto', clamp: true, align: i % 2 === 0 ? 'top' : 'bottom', offset: 6, color,
-        font: { size: 10, weight: '700' }, formatter: v => v != null ? round1_(v) + suffix : '' },
+        font: { size: fs(10), weight: '700' }, formatter: v => v != null ? round1_(v) + suffix : '' },
     };
   });
   charts[canvasId] = new Chart(canvas.getContext('2d'), {
@@ -295,13 +316,13 @@ function makeMultiLineChart(canvasId, labels, seriesList, yLabel, isPercent) {
       responsive: true, maintainAspectRatio: false, layout: { padding: { top: 10 } }, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'bottom', align: 'center',
-          padding: 12, labels: { boxWidth: 10, font: { size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
+          padding: 12, labels: { boxWidth: 10, font: { size: fs(11), weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
         tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.formattedValue}${suffix}` } },
       },
       scales: {
-        y: { beginAtZero: true, title: { display: true, text: yLabel, font: { size: 10 } },
-          ticks: { font: { size: 10 }, callback: v => v + suffix }, grid: { color: '#F0F4F8' } },
-        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { beginAtZero: true, title: { display: true, text: yLabel, font: { size: fs(10) } },
+          ticks: { font: { size: fs(10) }, callback: v => v + suffix }, grid: { color: '#F0F4F8' } },
+        x: { ticks: { font: { size: fs(10), weight: '700' } }, grid: { display: false } },
       },
     },
   });
@@ -311,9 +332,9 @@ function makeMultiLineChart(canvasId, labels, seriesList, yLabel, isPercent) {
 function nonQcChartCardsHTML(cityMeta) {
   return `
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach % + BBD % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % (LM Induced) ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-cancel"></span>Cancellation %</h3><div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>SDD & Faster %</h3><div class="chart-canvas-wrap"><canvas id="chartSddFaster"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>SDD & Faster % Inhouse + 3PL</h3><div class="chart-canvas-wrap"><canvas id="chartSddFaster"></canvas></div></div>
     <div class="chart-card span-2"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
     <div class="section-divider">Queue-Level TAT in Hrs (P80)</div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>Overall TAT</h3><div class="chart-canvas-wrap"><canvas id="chartTatOverall"></canvas></div></div>
@@ -369,15 +390,22 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
     cityMeta.overallBreachBaseline);
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
     [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean));
-  makeComboChart('chartCancel', labels, orders, series.map(r => round1_(r.cancellationPct * 100)), 'Cancellation %', null);
+  // Cancellation is a line only — the Orders bars were dropped per request, so
+  // this is now a plain % line on a single axis (no order-volume axis at all).
+  makeSingleLineChart('chartCancel', labels, series.map(r => round1_(r.cancellationPct * 100)),
+    'Cancellation %', '%', { beginAtZero: true, suffix: '%' });
   makeComboChart('chartSddFaster', labels, series.map(r => r.sddOrders ?? 0),
     series.map(r => r.sddFasterPct != null ? round1_(r.sddFasterPct * 100) : null), 'SDD & Faster %', null);
+  // Bars here are OFD orders, not delivered orders — axis + legend say so.
   makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %', null,
-    items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`]);
+    items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`],
+    'OFD Orders');
 
-  makeSingleLineChart('chartTatOverall', labels, series.map(r => r.overallTat), 'Overall TAT (hrs)', 'Hours');
-  makeSingleLineChart('chartTatSqMdq', labels, series.map(r => r.sqToMdq), 'SQ\u2192MDQ (hrs)', 'Hours');
-  makeSingleLineChart('chartTatMdqDel', labels, series.map(r => r.mdqToDel), 'MDQ\u2192Del (hrs)', 'Hours');
+  // Queue-level TAT charts: y axis pinned to 0 with a fixed 10-hr tick gap.
+  const tatYOpts = { beginAtZero: true, stepSize: 10 };
+  makeSingleLineChart('chartTatOverall', labels, series.map(r => r.overallTat), 'Overall TAT (hrs)', 'Hours', tatYOpts);
+  makeSingleLineChart('chartTatSqMdq', labels, series.map(r => r.sqToMdq), 'SQ\u2192MDQ (hrs)', 'Hours', tatYOpts);
+  makeSingleLineChart('chartTatMdqDel', labels, series.map(r => r.mdqToDel), 'MDQ\u2192Del (hrs)', 'Hours', tatYOpts);
 }
 
 function renderQcCharts(cityMeta, rawSeries, period) {
@@ -671,12 +699,14 @@ function storeListHTML(storesPayload) {
       <span>${(s.breachWithTolPct*100).toFixed(1)}%</span>
       <span>${s.dmSharePct != null ? (s.dmSharePct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.tpSharePct != null ? (s.tpSharePct*100).toFixed(1) + '%' : '—'}</span>
+      <span>${s.activeRiders != null ? Number(s.activeRiders).toLocaleString() : '—'}</span>
+      <span>${s.p80LmTat != null ? Number(s.p80LmTat).toFixed(1) : '—'}</span>
     </div>`).join('');
   return `
     <div class="section-label">Stores in ${storesPayload.city} <span style="font-weight:500;text-transform:none;">(as of ${fmtDayLabel(storesPayload.asOf)})</span></div>
     <div class="store-list">
       <div class="store-row store-header">
-        <span>Store</span><span>Trend</span><span>Total Orders</span><span>Breach %</span><span>DM Share</span><span>3P Share</span>
+        <span>Store</span><span>Trend</span><span>Total Orders</span><span>Breach %</span><span>DM Share</span><span>3P Share</span><span>Active Riders</span><span>TAT (hrs)</span>
       </div>
       ${rows}
     </div>`;
