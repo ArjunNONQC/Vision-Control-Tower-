@@ -644,9 +644,13 @@ select.control-select {
   margin: 8px 0 24px;
 }
 
+/* 8 columns: Store | Trend | Total Orders | Breach % | DM Share | 3P Share |
+   Active Riders | TAT. The count here MUST match the number of <span>s in
+   storeListHTML — it was previously 5 columns for 6 cells, which is what made
+   3P Share wrap onto a second line underneath the store name. */
 .store-row {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1.4fr 1.1fr 1fr 0.9fr 0.9fr 0.9fr 1fr 0.8fr;
   padding: 10px 18px;
   align-items: center;
   font-size: 13px;
@@ -669,3 +673,10 @@ select.control-select {
 .store-row.store-header:hover { background: #F8FAFC; }
 
 .store-code { font-weight: 700; color: var(--header-blue-2); }
+
+/* With 8 columns the table no longer fits a phone; scroll it sideways instead
+   of letting the cells squash into each other. */
+@media (max-width: 900px) {
+  .store-list { overflow-x: auto; }
+  .store-row { min-width: 720px; }
+}
