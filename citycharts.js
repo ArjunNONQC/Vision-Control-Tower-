@@ -784,16 +784,19 @@ function storeListHTML(storesPayload) {
 function panIndiaCardHTML(data) {
   if (!data.panIndiaAvailable || !data.panIndia) return '';
   const p = data.panIndia;
-  const pct = v => v != null ? (v * 100).toFixed(1) + '%' : '—';
+  const pct = v => (v * 100).toFixed(1) + '%';
+  // A metric with no source at all is dropped from the card rather than shown
+  // as "—". A dash implies the number exists and happens to be missing today;
+  // an absent row correctly says this metric isn't tracked for this service.
   const rows = [
-    ['Orders', p.orders != null ? p.orders.toLocaleString() : '—'],
-    ['Breach %', pct(p.breachPct)],
-    ['Long Tail %', pct(p.ltPct)],
-    ['Retry %', pct(p.retryPct)],
-  ].map(([name, val]) => `
+    ['Orders', p.orders != null ? p.orders.toLocaleString() : null],
+    ['Breach %', p.breachPct != null ? pct(p.breachPct) : null],
+    ['Long Tail %', p.ltPct != null ? pct(p.ltPct) : null],
+    ['Retry %', p.retryPct != null ? pct(p.retryPct) : null],
+  ].filter(pair => pair[1] != null).map(pair => `
       <div class="metric-row">
-        <span class="metric-name">${name}</span>
-        <span class="metric-vals"><span>${val}</span></span>
+        <span class="metric-name">${pair[0]}</span>
+        <span class="metric-vals"><span>${pair[1]}</span></span>
       </div>`).join('');
   return `
     <div class="city-card pan-india-card" onclick="goToCity('Pan India','${data.service}')">
