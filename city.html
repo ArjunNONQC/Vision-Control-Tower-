@@ -95,7 +95,7 @@ async function doRefresh() {
 }
 
 function renderCityData(data) {
-  cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
+  cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline, acceptancePartners: data.acceptancePartners || [] };
   rawSeries = data.series;
   document.getElementById('cityTitle').textContent = `${CITY} — ${service}`;
   document.getElementById('diagBanner').innerHTML = schemaWarningHTML(data.schemaWarnings);
