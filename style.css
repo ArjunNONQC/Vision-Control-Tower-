@@ -198,8 +198,11 @@ select.control-select {
 }
 
 .card-orders {
-  color: var(--text-muted);
-  font-weight: 600;
+  /* Was inheriting .driven-by's 11px at weight 600 — now larger and bolder so
+     it reads as a real figure, not a footnote next to "Driven by". */
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
 }
 
 .metric-row {
@@ -260,10 +263,10 @@ select.control-select {
 .trend-chip:hover { transform: translateY(-1px); filter: brightness(0.97); }
 
 .chip-orders {
-  font-size: 11px;
-  font-weight: 700;
-  opacity: 0.75;
-  padding-left: 2px;
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 1;
+  padding-left: 3px;
 }
 
 .empty-state {
