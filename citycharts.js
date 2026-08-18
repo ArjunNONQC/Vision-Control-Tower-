@@ -368,11 +368,13 @@ function nonQcChartCardsHTML(cityMeta) {
 function qcChartCardsHTML(cityMeta) {
   return `
     <div class="chart-card"><h3><span class="card-dot dot-share"></span>Rider Share (Inhouse vs 3P)</h3><div class="chart-canvas-wrap"><canvas id="chartRiderShare"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-share"></span>Batching % / Manual Assigned %</h3><div class="chart-canvas-wrap"><canvas id="chartBatching"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachPlain"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD%</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (min)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Fake Retry %</h3><div class="chart-canvas-wrap"><canvas id="chartFakeRetry"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-nps"></span>NPS (7d rolling)</h3><div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div></div>
     ${riderEfficiencyCardsHTML()}`;
 }
@@ -380,6 +382,7 @@ function qcChartCardsHTML(cityMeta) {
 function storeChartCardsHTML() {
   return `
     <div class="chart-card"><h3><span class="card-dot dot-share"></span>Rider Share (Inhouse vs 3P)</h3><div class="chart-canvas-wrap"><canvas id="chartRiderShare"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-share"></span>Batching % / Manual Assigned %</h3><div class="chart-canvas-wrap"><canvas id="chartBatching"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach % <span class="baseline-legend"><span class="baseline-swatch"></span>Baseline 40.0%</span></h3><div class="chart-canvas-wrap"><canvas id="chartBreachPlain"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD%</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % <span class="baseline-legend"><span class="baseline-swatch"></span>Baseline 4.0%</span></h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
@@ -451,10 +454,25 @@ function renderNpsChart(rawSeries, period) {
     'NPS', false);
 }
 
+// Fake Retry — QC-only (the source tab has a Non-QC block too, but it's out
+// of scope for this app per request). Always renders from the RAW daily
+// series, ignoring the DoD/WoW toggle, same reasoning as NPS: the sheet gives
+// us the % and a raw count, but not the count's own denominator, so there is
+// no correct way to re-weight this into a proper weekly average — showing the
+// daily values as-is is more honest than computing a plausible-looking wrong
+// one. Bars = fakeRetryCount (a plain count, at least additive — though not
+// shown accumulated since the daily grain never changes); line = fakeRetryPct.
+function renderFakeRetryChart(rawSeries) {
+  const labels = rawSeries.map(r => fmtDayLabel(r.date));
+  makeComboChart('chartFakeRetry', labels, rawSeries.map(r => r.fakeRetryCount ?? 0),
+    rawSeries.map(r => r.fakeRetryPct != null ? round1_(r.fakeRetryPct * 100) : null), 'Fake Retry %',
+    null, null, 'Fake Retries');
+}
+
 function renderQcCharts(cityMeta, rawSeries, period) {
   const acceptancePartners = cityMeta.acceptancePartners || [];
   const acceptFields = acceptancePartners.map(p => 'accept__' + p);
-  const pctFields = ['breachPct','breachWithTolPct','bbdBreachPct','ltPct','dmSharePct','tpSharePct'];
+  const pctFields = ['breachPct','breachWithTolPct','bbdBreachPct','ltPct','dmSharePct','tpSharePct','batchingPct','manualAssignedPct'];
   const avgFields = ['p80LmTat','avgActiveHrs','avgIdleHrs','efficiencyPerDay','efficiencyPerHour',
     'activeRiders','mgEligiblePct','pctNotHittingUpperThreshold', ...acceptFields];
   const series = period === 'WoW' ? toWeekly(rawSeries, pctFields, avgFields) : rawSeries;
@@ -464,6 +482,9 @@ function renderQcCharts(cityMeta, rawSeries, period) {
   makeDualLineChart('chartRiderShare', labels,
     series.map(r => r.dmSharePct != null ? round1_(r.dmSharePct * 100) : null), 'Inhouse Share %',
     series.map(r => r.tpSharePct != null ? round1_(r.tpSharePct * 100) : null), '3P Share %', '%');
+  makeDualLineChart('chartBatching', labels,
+    series.map(r => r.batchingPct != null ? round1_(r.batchingPct * 100) : null), 'Batching %',
+    series.map(r => r.manualAssignedPct != null ? round1_(r.manualAssignedPct * 100) : null), 'Manual Assigned %', '%');
   // Baseline now overlays the plain "Breach %" chart, not the "Breach with
   // Tol% + BBD%" combo — moved per request. The underlying series on each
   // chart are unchanged: chartBreachPlain still plots raw breachPct,
@@ -484,6 +505,7 @@ function renderQcCharts(cityMeta, rawSeries, period) {
     items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`],
     'OFD Orders');
   renderNpsChart(rawSeries, period);
+  renderFakeRetryChart(rawSeries);
 
   renderRiderEfficiencyCharts(labels, series, acceptancePartners);
 }
@@ -514,7 +536,7 @@ function renderRiderEfficiencyCharts(labels, series, acceptancePartners) {
 function renderStoreCharts(rawSeries, period, acceptancePartners) {
   acceptancePartners = acceptancePartners || [];
   const acceptFields = acceptancePartners.map(p => 'accept__' + p);
-  const pctFields = ['breachPct','breachWithTolPct','bbdBreachPct','ltPct','dmSharePct','tpSharePct'];
+  const pctFields = ['breachPct','breachWithTolPct','bbdBreachPct','ltPct','dmSharePct','tpSharePct','batchingPct','manualAssignedPct'];
   const avgFields = ['p80LmTat','avgActiveHrs','avgIdleHrs','efficiencyPerDay','efficiencyPerHour',
     'activeRiders','mgEligiblePct','pctNotHittingUpperThreshold', ...acceptFields];
   const series = period === 'WoW' ? toWeekly(rawSeries, pctFields, avgFields) : rawSeries;
@@ -524,6 +546,9 @@ function renderStoreCharts(rawSeries, period, acceptancePartners) {
   makeDualLineChart('chartRiderShare', labels,
     series.map(r => r.dmSharePct != null ? round1_(r.dmSharePct * 100) : null), 'Inhouse Share %',
     series.map(r => r.tpSharePct != null ? round1_(r.tpSharePct * 100) : null), '3P Share %', '%');
+  makeDualLineChart('chartBatching', labels,
+    series.map(r => r.batchingPct != null ? round1_(r.batchingPct * 100) : null), 'Batching %',
+    series.map(r => r.manualAssignedPct != null ? round1_(r.manualAssignedPct * 100) : null), 'Manual Assigned %', '%');
   makeComboChart('chartBreachPlain', labels, orders, series.map(r => round1_(r.breachPct * 100)), 'Breach %',
     [baselineLineDataset(0.40, series.length)].filter(Boolean));
   makeBreachBddChart('chartBreachBdd', labels,
@@ -653,9 +678,11 @@ function schemaWarningHTML(schemaWarnings) {
   const accept = schemaWarnings.qc3pAcceptanceMissingColumns || [];
   const eta = schemaWarnings.nonQcEtaMissingColumns || [];
   const nps = schemaWarnings.npsMissingColumns || [];
+  const batching = schemaWarnings.qcBatchingMissingColumns || [];
+  const fakeRetry = schemaWarnings.fakeRetryMissingColumns || [];
   const missingTabs = schemaWarnings.missingTabs || [];
   const joins = schemaWarnings.joinWarnings || [];
-  if (!missingTabs.length && !joins.length && !nq.length && !qc.length && !sdd.length && !canc.length && !noBaseline.length && !eff.length && !accept.length && !eta.length && !nps.length) return '';
+  if (!missingTabs.length && !joins.length && !nq.length && !qc.length && !sdd.length && !canc.length && !noBaseline.length && !eff.length && !accept.length && !eta.length && !nps.length && !batching.length && !fakeRetry.length) return '';
   const parts = [];
   // Tab-level failures come first: if the tab itself didn't resolve, every
   // column warning under it is noise.
@@ -669,6 +696,8 @@ function schemaWarningHTML(schemaWarnings) {
   if (accept.length) parts.push(`QC 3P Acceptance Rate: couldn't find column(s) for ${accept.join(', ')}`);
   if (eta.length) parts.push(`NON-QC Eta: couldn't find column(s) for ${eta.join(', ')}`);
   if (nps.length) parts.push(`NPS: couldn't find column(s) for ${nps.join(', ')}`);
+  if (batching.length) parts.push(`QC BATCHING: couldn't find column(s) for ${batching.join(', ')}`);
+  if (fakeRetry.length) parts.push(`Fake Retry: ${fakeRetry.join(', ')}`);
   if (noBaseline.length) parts.push(`Base Config: no matching row for ${noBaseline.join(', ')} — their Breach % baseline won't be drawn until the city name in Base Config exactly matches Dump NONQC`);
   return `<div class="schema-warning">⚠ Sheet column mismatch — ${parts.join(' · ')}. Those fields are reading as 0 until the header names match.</div>`;
 }
