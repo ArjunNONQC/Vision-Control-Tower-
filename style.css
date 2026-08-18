@@ -197,6 +197,11 @@ select.control-select {
   margin-bottom: 10px;
 }
 
+.card-orders {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
 .metric-row {
   display: flex;
   justify-content: space-between;
@@ -253,6 +258,13 @@ select.control-select {
 }
 
 .trend-chip:hover { transform: translateY(-1px); filter: brightness(0.97); }
+
+.chip-orders {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.75;
+  padding-left: 2px;
+}
 
 .empty-state {
   color: var(--text-muted);
