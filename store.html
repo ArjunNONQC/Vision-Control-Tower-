@@ -3,9 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- The HTML files carry no ?v= cache-buster (they ARE the entry point), so
+     without this a browser or CDN can serve a months-old page that loads the
+     new JS but keeps old inline markup. Revalidate the shell every time; the
+     versioned .js/.css it pulls in stay cacheable. -->
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — Store Detail</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=16" />
+<link rel="stylesheet" href="style.css?v=17" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -31,7 +36,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=24"></script>
+<script src="citycharts.js?v=27"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const STORE_CODE = params.get('store');
