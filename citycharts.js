@@ -368,10 +368,10 @@ function nonQcChartCardsHTML(cityMeta) {
 function qcChartCardsHTML(cityMeta) {
   return `
     <div class="chart-card"><h3><span class="card-dot dot-share"></span>Rider Share (Inhouse vs 3P)</h3><div class="chart-canvas-wrap"><canvas id="chartRiderShare"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach %</h3><div class="chart-canvas-wrap"><canvas id="chartBreachPlain"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD% ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachPlain"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD%</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (hrs)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (min)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-nps"></span>NPS (7d rolling)</h3><div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div></div>
     ${riderEfficiencyCardsHTML()}`;
@@ -380,10 +380,10 @@ function qcChartCardsHTML(cityMeta) {
 function storeChartCardsHTML() {
   return `
     <div class="chart-card"><h3><span class="card-dot dot-share"></span>Rider Share (Inhouse vs 3P)</h3><div class="chart-canvas-wrap"><canvas id="chartRiderShare"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach %</h3><div class="chart-canvas-wrap"><canvas id="chartBreachPlain"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD% <span class="baseline-legend"><span class="baseline-swatch"></span>Baseline 40.0%</span></h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach % <span class="baseline-legend"><span class="baseline-swatch"></span>Baseline 40.0%</span></h3><div class="chart-canvas-wrap"><canvas id="chartBreachPlain"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD%</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % <span class="baseline-legend"><span class="baseline-swatch"></span>Baseline 4.0%</span></h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (hrs)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (min)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
     ${riderEfficiencyCardsHTML()}`;
 }
 
@@ -464,14 +464,19 @@ function renderQcCharts(cityMeta, rawSeries, period) {
   makeDualLineChart('chartRiderShare', labels,
     series.map(r => r.dmSharePct != null ? round1_(r.dmSharePct * 100) : null), 'Inhouse Share %',
     series.map(r => r.tpSharePct != null ? round1_(r.tpSharePct * 100) : null), '3P Share %', '%');
-  makeComboChart('chartBreachPlain', labels, orders, series.map(r => round1_(r.breachPct * 100)), 'Breach %', null);
+  // Baseline now overlays the plain "Breach %" chart, not the "Breach with
+  // Tol% + BBD%" combo — moved per request. The underlying series on each
+  // chart are unchanged: chartBreachPlain still plots raw breachPct,
+  // chartBreachBdd still plots breachWithTolPct + bbdBreachPct. Only the
+  // dashed baseline overlay moved between them.
+  makeComboChart('chartBreachPlain', labels, orders, series.map(r => round1_(r.breachPct * 100)), 'Breach %',
+    [baselineLineDataset(cityMeta.overallBreachBaseline, series.length)].filter(Boolean));
   makeBreachBddChart('chartBreachBdd', labels,
     series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach with Tol %',
-    series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %',
-    cityMeta.overallBreachBaseline);
+    series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %');
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
     [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean));
-  makeSingleLineChart('chartLmTat', labels, series.map(r => r.p80LmTat), 'P80 LM TAT (hrs)', 'Hours');
+  makeSingleLineChart('chartLmTat', labels, series.map(r => r.p80LmTat), 'P80 LM TAT (min)', 'Minutes');
   // QC Retry Rate — same construction as the Non-QC one: OFD orders on the
   // left axis, retry % line on the right, retries/OFD in the tooltip.
   makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0),
@@ -519,14 +524,14 @@ function renderStoreCharts(rawSeries, period, acceptancePartners) {
   makeDualLineChart('chartRiderShare', labels,
     series.map(r => r.dmSharePct != null ? round1_(r.dmSharePct * 100) : null), 'Inhouse Share %',
     series.map(r => r.tpSharePct != null ? round1_(r.tpSharePct * 100) : null), '3P Share %', '%');
-  makeComboChart('chartBreachPlain', labels, orders, series.map(r => round1_(r.breachPct * 100)), 'Breach %', null);
+  makeComboChart('chartBreachPlain', labels, orders, series.map(r => round1_(r.breachPct * 100)), 'Breach %',
+    [baselineLineDataset(0.40, series.length)].filter(Boolean));
   makeBreachBddChart('chartBreachBdd', labels,
     series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach with Tol %',
-    series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %',
-    0.40);
+    series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %');
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
     [baselineLineDataset(0.04, series.length)].filter(Boolean));
-  makeSingleLineChart('chartLmTat', labels, series.map(r => r.p80LmTat), 'P80 LM TAT (hrs)', 'Hours');
+  makeSingleLineChart('chartLmTat', labels, series.map(r => r.p80LmTat), 'P80 LM TAT (min)', 'Minutes');
 
   renderRiderEfficiencyCharts(labels, series, acceptancePartners);
 }
@@ -727,6 +732,16 @@ function coldChainHTML(coldChain) {
     </div>`;
 }
 
+// Home page's Cold Trip Summary — same card markup as the per-city cold-chain
+// scorecard (coldChainHTML), just fed the sheet's Grand Total row instead of a
+// city row and wrapped in its own row so it doesn't crowd the order/ageing
+// scorecards on the city page. Renders nothing if the tab has no Grand Total
+// row, rather than a misleading "0 trips" card.
+function coldTripSummaryHomeHTML(grandTotal) {
+  if (!grandTotal) return '';
+  return `<div class="scorecard-row" style="margin: 6px 0 20px;">${coldChainHTML(grandTotal)}</div>`;
+}
+
 // ======================= STORE LIST (QC city page) =======================
 // Lightweight inline SVG sparkline — no Chart.js instance per row, just a
 // plain polyline. Cheap enough to render dozens of these in a store list.
@@ -804,6 +819,25 @@ function panIndiaCardHTML(data) {
       <div class="driven-by">National rollup — ${data.service} · ${data.period}</div>
       ${rows}
     </div>`;
+}
+
+// ======================= METRIC DISPLAY LABELS =======================
+// Canonical display names live HERE, in citycharts.js, not in the page HTML.
+// The pages load this file with a ?v= cache-buster, but the HTML itself has no
+// such handle — browsers and the Pages CDN will happily serve a months-old
+// index.html. A label defined in HTML therefore gets stranded on people's
+// screens long after it was changed; defined here, it ships with the version
+// bump like every other asset.
+//
+// The regex also strips a legacy "(LM Induced)" suffix from whatever the
+// backend sends. Metric strings are baked into cached payloads, so a warmed
+// cache can keep serving the old wording for hours after a deploy — this makes
+// the display correct regardless of which vintage of payload arrives.
+function metricLabel(m) {
+  const s = (m || '').toString().trim();
+  if (s === 'Overall Breach') return 'Overall Breach';
+  const cleaned = s.replace(/\s*\(\s*LM\s*Induced\s*\)\s*/i, '').trim();
+  return cleaned || 'Long Tail';
 }
 
 // ======================= NETWORK (localStorage cache + stale-while-revalidate + retrying) =======================
@@ -887,16 +921,35 @@ async function runWithConcurrency_(tasks, limit) {
   await Promise.all(workers);
 }
 
-// Silently warms the browser cache for every city (and every QC store) right
-// after the home page renders, so clicking into any city or store later is
-// served instantly from sessionStorage instead of hitting the network.
-// QC cities are queued FIRST — they're the slower ones to compute (store-level
-// rollup), so they get the head start on warming before you're likely to click one.
-async function prefetchAllCitiesAndStores() {
+// Silently warms the browser cache right after the home page renders, so
+// clicking through later is served from localStorage instead of the network.
+//
+// Priority order matters, because the tail of this queue (every QC store) is
+// long and the user may click within seconds:
+//   1. The other home toggle combinations. The home payload is per
+//      service+period, so flipping QC/Non-QC or DoD/WoW used to hit the network
+//      even though the user hadn't left the page — the most likely first click
+//      on the home screen was the one thing not being warmed.
+//   2. Pan India, for both services. It's the first card on the grid, but it
+//      never appeared in the meta city list: that list is built from the dump
+//      tabs, which deliberately strip Pan India rows.
+//   3. QC cities (slower to compute — store-level rollup), then their stores.
+//   4. Non-QC cities.
+async function prefetchAllCitiesAndStores(currentService, currentPeriod) {
   try {
     const meta = await cachedFetchJSON(`${WEBAPP_URL}?action=meta`, 10 * 60 * 1000);
     const tasks = [];
     const byService = meta.citiesByService || {};
+
+    ['Non-QC Inhouse', 'QC'].forEach(svc => {
+      ['DoD', 'WoW'].forEach(per => {
+        if (svc === currentService && per === currentPeriod) return; // already loaded
+        tasks.push(() => cachedFetchJSON(
+          `${WEBAPP_URL}?action=home&service=${encodeURIComponent(svc)}&period=${per}`));
+      });
+    });
+
+    ['QC', 'Non-QC Inhouse'].forEach(svc => tasks.push(() => fetchCityData('Pan India', svc)));
 
     (byService['QC'] || []).forEach(city => {
       tasks.push(() => fetchCityData(city, 'QC'));
@@ -911,7 +964,7 @@ async function prefetchAllCitiesAndStores() {
       tasks.push(() => fetchCityData(city, 'Non-QC Inhouse'));
     });
 
-    await runWithConcurrency_(tasks, 4); // cap concurrent requests so we don't hammer the Apps Script quota
+    await runWithConcurrency_(tasks, 4); // cap concurrency so we don't hammer the Apps Script quota
   } catch (e) { /* background warming is best-effort — a failure here shouldn't affect the visible page */ }
 }
 
