@@ -63,7 +63,7 @@
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=32"></script>
+<script src="citycharts.js?v=33"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -181,9 +181,10 @@ async function doHardRefresh() {
   btn.classList.add('spinning');
   btn.disabled = true;
   try {
+    status.title = '';
     status.textContent = 'Clearing cache…';
     const res = await fetch(`${WEBAPP_URL}?action=hardrefresh`);
-    const result = await res.json();
+    const result = await parseJsonResponse_(res);
     if (result.error) throw new Error(result.error);
 
     // Server cache is now empty; the client's own copy would otherwise keep
@@ -203,7 +204,13 @@ async function doHardRefresh() {
     status.textContent = 'Refreshing cities & stores in background…';
     setTimeout(() => { if (status.textContent.indexOf('background') !== -1) status.textContent = ''; }, 8000);
   } catch (err) {
-    status.textContent = 'Hard refresh failed: ' + err.message;
+    // The full message (esp. the HTML-instead-of-JSON explanation from
+    // parseJsonResponse_) can run long — keep the header bar's height intact
+    // by showing a short line, with the complete detail on hover and in the
+    // console for whoever's actually debugging this.
+    console.error('Hard refresh failed:', err);
+    status.textContent = 'Hard refresh failed — hover for details';
+    status.title = err.message;
   } finally {
     btn.classList.remove('spinning');
     btn.disabled = false;
