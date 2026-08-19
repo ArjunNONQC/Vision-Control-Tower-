@@ -63,7 +63,7 @@
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=35"></script>
+<script src="citycharts.js?v=36"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -73,7 +73,13 @@ function initLock() {
   const input = document.getElementById('lockInput');
   const errorEl = document.getElementById('lockError');
 
-  if (sessionStorage.getItem(LOCK_KEY) === '1') {
+  // localStorage (not sessionStorage) — sessionStorage is scoped per tab, so
+  // navigating back from a city page in a way the browser treats as a "new"
+  // browsing context (a new tab, or a mobile browser that discards session
+  // storage when backgrounded) re-triggered the lock screen. localStorage is
+  // shared across tabs/windows for this origin and survives that, so once
+  // unlocked it stays unlocked until the browser's site data is cleared.
+  if (localStorage.getItem(LOCK_KEY) === '1') {
     lockScreen.style.display = 'none';
     appRoot.style.display = 'block';
     load();
@@ -82,7 +88,7 @@ function initLock() {
 
   function tryUnlock() {
     if (input.value === DASHBOARD_PASSWORD) {
-      sessionStorage.setItem(LOCK_KEY, '1');
+      localStorage.setItem(LOCK_KEY, '1');
       lockScreen.style.display = 'none';
       appRoot.style.display = 'block';
       load();
