@@ -820,14 +820,17 @@ function coldChainHTML(coldChain) {
     </div>`;
 }
 
-// Home page's Cold Trip Summary — same card markup as the per-city cold-chain
-// scorecard (coldChainHTML), just fed the sheet's Grand Total row instead of a
-// city row and wrapped in its own row so it doesn't crowd the order/ageing
-// scorecards on the city page. Renders nothing if the tab has no Grand Total
-// row, rather than a misleading "0 trips" card.
-function coldTripSummaryHomeHTML(grandTotal) {
-  if (!grandTotal) return '';
-  return `<div class="scorecard-row" style="margin: 6px 0 20px;">${coldChainHTML(grandTotal)}</div>`;
+// Home page's top row: Cold Trip Summary (same card markup as the per-city
+// cold-chain scorecard, fed the sheet's Grand Total row) sitting next to the
+// Pan India card — moved here from "Needs attention" per request, since Pan
+// India isn't really a city that can "breach" against its own baseline, it's
+// the national rollup. Renders whichever of the two is actually available;
+// if neither is, the row collapses to nothing rather than leaving a gap.
+function coldTripSummaryHomeHTML(grandTotal, panData) {
+  const cold = grandTotal ? coldChainHTML(grandTotal) : '';
+  const pan = panData ? (panIndiaCardHTML(panData) || '') : '';
+  if (!cold && !pan) return '';
+  return `<div class="scorecard-row top-summary-row" style="margin: 6px 0 20px;">${cold}${pan}</div>`;
 }
 
 // ======================= AGEING TABLE MODAL =======================
@@ -880,7 +883,13 @@ async function openAgeingModal_(service) {
 
 function ageingTableHTML_(data) {
   if (!data || data.error) return `<div class="empty-state">Couldn't load the ageing table${data && data.error ? ': ' + data.error : ''}.</div>`;
-  const rows = data.rows || [];
+  // A stray "QC" (or "Non-QC"/"Non QC") row can end up in this list — the
+  // Ageing tab's block-boundary detection reads the OTHER block's own label
+  // cell as if it were a city, when it sits inside this block's row range.
+  // Filtered here defensively; see the note left for the backend fix in
+  // readAgeing_ (the real, permanent fix belongs at the source).
+  const isStrayBlockLabel = name => /^(non[\s-]?)?qc$/i.test((name || '').toString().trim());
+  const rows = (data.rows || []).filter(r => !isStrayBlockLabel(r.city));
   if (!rows.length) return '<div class="empty-state">No ageing data for this service yet.</div>';
   const body = rows.map(r => `
     <tr>
