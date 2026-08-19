@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — Explore All Cities</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=21" />
+<link rel="stylesheet" href="style.css?v=22" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -45,7 +45,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=34"></script>
+<script src="citycharts.js?v=35"></script>
 <script>
 let period = 'DoD';
 let service = 'Non-QC Inhouse';
@@ -124,7 +124,7 @@ async function renderExploreData(data) {
   rawSeries = data.series;
   document.getElementById('diagBanner').innerHTML = schemaWarningHTML(data.schemaWarnings);
   document.getElementById('scorecardHolder').innerHTML =
-    statPanelsHTML(data.orderSummary, data.coldChain, data.ageing, data.ageing ? 'D-1, latest' : null);
+    statPanelsHTML(data.orderSummary, data.coldChain, data.ageing, data.ageing ? 'D-1, latest' : null, service);
   document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
   renderForService();
 
