@@ -45,7 +45,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=35"></script>
+<script src="citycharts.js?v=36"></script>
 <script>
 let period = 'DoD';
 let service = 'Non-QC Inhouse';
@@ -128,14 +128,16 @@ async function renderExploreData(data) {
   document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
   renderForService();
 
-  // Retry Rate / Fake Retry % baselines = Pan India's own current-day value
-  // for that metric — see the note in city.html for why this is a second,
-  // non-blocking fetch rather than part of the main city payload.
+  // Retry Rate / Fake Retry % / Cancellation % baselines = Pan India's own
+  // current-day value for that metric — see the note in city.html for why
+  // this is a second, non-blocking fetch rather than part of the main city
+  // payload.
   const thisRawSeries = rawSeries;
-  const { retryBaseline, fakeRetryBaseline } = await fetchPanIndiaRetryBaselines_(service);
+  const { retryBaseline, fakeRetryBaseline, cancellationBaseline } = await fetchPanIndiaRetryBaselines_(service);
   if (rawSeries !== thisRawSeries) return; // user switched city/service while this was in flight
   cityMeta.retryBaseline = retryBaseline;
   cityMeta.fakeRetryBaseline = fakeRetryBaseline;
+  cityMeta.cancellationBaseline = cancellationBaseline;
   document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
   renderForService();
 }
