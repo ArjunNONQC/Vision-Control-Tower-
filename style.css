@@ -647,6 +647,35 @@ select.control-select {
 .btn-icon-refresh.spinning { animation: spin 0.8s linear infinite; }
 .btn-icon-refresh:disabled { opacity: 0.6; cursor: default; }
 
+/* Deliberately louder than .btn-icon-refresh — this one clears cache
+   everywhere and triggers a full background re-warm, not a quick single-view
+   refresh, and the button should look like it does more work. */
+.btn-hard-refresh {
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.25);
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+.btn-hard-refresh:hover { background: rgba(255,255,255,0.26); }
+.btn-hard-refresh:disabled { opacity: 0.6; cursor: default; }
+.btn-hard-refresh.spinning { animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+.hard-refresh-status {
+  font-size: 12px;
+  color: #fff;
+  opacity: 0.85;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
 /* Schema mismatch warning banner */
 .schema-warning {
   background: var(--amber-bg);
