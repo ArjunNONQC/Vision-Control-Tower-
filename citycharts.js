@@ -925,12 +925,36 @@ async function cachedFetchJSON(url, opts) {
   return fetchAndCache_(url, key);
 }
 
+// Every action in this app gets its response parsed through here. A response
+// body starting with "<!DOCTYPE" or "<html" means the request never reached
+// doGet's JSON-returning logic at all — Apps Script served its own page
+// instead (almost always one of: the script was edited but never redeployed
+// as a NEW VERSION, the web app's access setting doesn't match how it's being
+// requested, or the account hitting the URL needs to re-authorize it). The
+// native error for that case — "Unexpected token '<' ... is not valid JSON"
+// — names a symptom, not a cause, so this replaces it with something
+// actionable instead of leaving the person to guess.
+async function parseJsonResponse_(res) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    const looksLikeHtml = /^\s*<(!doctype|html)/i.test(text);
+    if (looksLikeHtml) {
+      throw new Error('Apps Script returned a page instead of data — the script most likely needs to be ' +
+        'redeployed as a NEW VERSION (Deploy > Manage deployments > Edit > New version; Save alone does not ' +
+        'push changes), or its web app access setting doesn\'t match how this page is requesting it.');
+    }
+    throw new Error('Server returned something that isn\'t valid JSON: ' + text.slice(0, 200));
+  }
+}
+
 async function fetchAndCache_(url, key) {
   let lastErr;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetch(url);
-      const data = await res.json();
+      const data = await parseJsonResponse_(res);
       if (data.error) throw new Error(data.error);
       try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch (e) { /* storage full — skip caching */ }
       return data;
