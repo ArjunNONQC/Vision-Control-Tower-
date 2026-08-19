@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — City Detail</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=20" />
+<link rel="stylesheet" href="style.css?v=21" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -18,7 +18,7 @@
 
 <div class="topbar">
   <div>
-    <a class="nav-btn" href="index.html">← Vision Home</a>
+    <a class="nav-btn" id="homeLink" href="index.html">← Vision Home</a>
     <h1><img src="vision-icon.svg" alt="" class="vision-icon" /><span id="cityTitle">Loading…</span></h1>
   </div>
   <div class="controls">
@@ -42,7 +42,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=33"></script>
+<script src="citycharts.js?v=34"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const CITY = params.get('city');
@@ -55,11 +55,19 @@ document.getElementById('cityTitle').textContent = CITY;
   b.classList.toggle('active', b.dataset.val === service);
 });
 
+// So "← Vision Home" from a QC city lands on the QC home view (and Non-QC on
+// Non-QC), instead of always resetting to Non-QC.
+function updateHomeLink_() {
+  document.getElementById('homeLink').href = `index.html?service=${encodeURIComponent(service)}`;
+}
+updateHomeLink_();
+
 document.getElementById('serviceToggle').addEventListener('click', (e) => {
   if (e.target.tagName !== 'BUTTON') return;
   [...e.currentTarget.children].forEach(b => b.classList.remove('active'));
   e.target.classList.add('active');
   service = e.target.dataset.val;
+  updateHomeLink_();
   load();
 });
 document.getElementById('periodToggle').addEventListener('click', (e) => {
@@ -99,7 +107,7 @@ async function doRefresh() {
   finally { btn.classList.remove('spinning'); btn.disabled = false; }
 }
 
-function renderCityData(data) {
+async function renderCityData(data) {
   cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline, acceptancePartners: data.acceptancePartners || [] };
   rawSeries = data.series;
   document.getElementById('cityTitle').textContent = `${CITY} — ${service}`;
@@ -111,6 +119,18 @@ function renderCityData(data) {
 
   document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
   renderForService();
+
+  // Retry Rate / Fake Retry % baselines = Pan India's own current-day value
+  // for that metric. Fetched separately (usually served instantly from the
+  // background prefetch cache) and only re-rendered once it resolves, so the
+  // rest of the page never waits on it.
+  const { retryBaseline, fakeRetryBaseline } = await fetchPanIndiaRetryBaselines_(service);
+  if (cityMeta.retryBaseline !== retryBaseline || cityMeta.fakeRetryBaseline !== fakeRetryBaseline) {
+    cityMeta.retryBaseline = retryBaseline;
+    cityMeta.fakeRetryBaseline = fakeRetryBaseline;
+    document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
+    renderForService();
+  }
 }
 load();
 </script>
