@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — City Tracker</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=20" />
+<link rel="stylesheet" href="style.css?v=21" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -63,7 +63,7 @@
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=33"></script>
+<script src="citycharts.js?v=34"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -98,7 +98,14 @@ function initLock() {
   input.focus();
 }
 
-const state = { service: 'Non-QC Inhouse', period: 'DoD' };
+// Deep-linked from a city/store/explore page via ?service=... so coming back
+// to "Vision Home" from a QC city lands on the QC home view (and Non-QC on
+// Non-QC), instead of always resetting to Non-QC.
+const requestedService = new URLSearchParams(window.location.search).get('service');
+const state = { service: requestedService === 'QC' ? 'QC' : 'Non-QC Inhouse', period: 'DoD' };
+[...document.getElementById('serviceToggle').children].forEach(b => {
+  b.classList.toggle('active', b.dataset.val === state.service);
+});
 
 document.getElementById('serviceToggle').addEventListener('click', (e) => {
   if (e.target.tagName !== 'BUTTON') return;
@@ -240,17 +247,25 @@ function renderHomeData(data) {
 
     const grid = document.getElementById('breachGrid');
     const panCard = panIndiaCardHTML(data);
-    if (!data.cities.length) {
+    // ROI is filtered out of every list, QC and Non-QC alike. "Needs
+    // attention" is then ordered by order volume (descending), not by
+    // breach % — the busiest city surfaces first regardless of how far over
+    // its baseline it is.
+    const citiesForGrid = data.cities
+      .filter(c => !isExcludedCity_(c.city))
+      .sort((a, b) => (b.orders || 0) - (a.orders || 0));
+    if (!citiesForGrid.length) {
       grid.innerHTML = panCard || '<div class="empty-state">No breached cities in this view.</div>';
     } else {
-      grid.innerHTML = panCard + data.cities.map(renderBreachCard).join('');
+      grid.innerHTML = panCard + citiesForGrid.map(renderBreachCard).join('');
     }
 
+    const trendCities = data.asPerTrend.filter(c => !isExcludedCity_(c.city));
     const strip = document.getElementById('trendStrip');
-    if (!data.asPerTrend.length) {
+    if (!trendCities.length) {
       strip.innerHTML = '<div class="empty-state">—</div>';
     } else {
-      strip.innerHTML = data.asPerTrend.map(c =>
+      strip.innerHTML = trendCities.map(c =>
         `<div class="trend-chip" onclick="goToCity('${c.city}','${c.service}')">${cityIconHTML_(c.city)}${c.city}${c.orders != null ? `<span class="chip-orders">${c.orders.toLocaleString()}</span>` : ''}</div>`
       ).join('');
     }
