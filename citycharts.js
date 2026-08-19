@@ -93,10 +93,14 @@ function toWeekly(series, pctFields, avgFields) {
   });
 }
 
-function baselineLineDataset(value, len, yAxisID) {
+// label defaults to 'Baseline' (the fixed Base-Config/QC targets); the
+// Retry Rate / Fake Retry % callers below pass 'PAN India' instead, since
+// that line is literally today's Pan India value for that metric, not a
+// fixed target — the legend/tooltip text says so.
+function baselineLineDataset(value, len, yAxisID, label) {
   if (value == null) return null;
   return {
-    type: 'line', label: 'Baseline', yAxisID: yAxisID || 'yPct',
+    type: 'line', label: label || 'Baseline', yAxisID: yAxisID || 'yPct',
     data: Array(len).fill(round1_(value * 100)),
     borderColor: COLOR.baseline, borderDash: [6, 4], pointRadius: 0, borderWidth: 2, fill: false,
     datalabels: { display: false },
@@ -382,8 +386,8 @@ function nonQcChartCardsHTML(cityMeta) {
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-cancel"></span>Cancellation %</h3><div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>SDD & Faster % Inhouse + 3PL</h3><div class="chart-canvas-wrap"><canvas id="chartSddFaster"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate ${cityMeta.retryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.retryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Fake Retry % ${cityMeta.fakeRetryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.fakeRetryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartFakeRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate ${cityMeta.retryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>PAN India ${(cityMeta.retryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Fake Retry % ${cityMeta.fakeRetryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>PAN India ${(cityMeta.fakeRetryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartFakeRetry"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-nps"></span>NPS (7d rolling)</h3><div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div></div>
     <div class="section-divider">Queue-Level TAT in Hrs (P80)</div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>Overall TAT</h3><div class="chart-canvas-wrap"><canvas id="chartTatOverall"></canvas></div></div>
@@ -400,7 +404,7 @@ function qcChartCardsHTML(cityMeta) {
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD%</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (min)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate ${cityMeta.retryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.retryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate ${cityMeta.retryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>PAN India ${(cityMeta.retryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-nps"></span>NPS (7d rolling)</h3><div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div></div>
     ${riderEfficiencyCardsHTML()}`;
 }
@@ -451,7 +455,7 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
     series.map(r => r.sddFasterPct != null ? round1_(r.sddFasterPct * 100) : null), 'SDD & Faster %', null);
   // Bars here are OFD orders, not delivered orders — axis + legend say so.
   makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %',
-    [baselineLineDataset(cityMeta.retryBaseline, series.length)].filter(Boolean),
+    [baselineLineDataset(cityMeta.retryBaseline, series.length, null, 'PAN India')].filter(Boolean),
     items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`],
     'OFD Orders');
 
@@ -493,7 +497,7 @@ function renderFakeRetryChart(rawSeries, cityMeta) {
   const labels = rawSeries.map(r => fmtDayLabel(r.date));
   makeComboChart('chartFakeRetry', labels, rawSeries.map(r => r.fakeRetryCount ?? 0),
     rawSeries.map(r => r.fakeRetryPct != null ? round1_(r.fakeRetryPct * 100) : null), 'Fake Retry %',
-    [baselineLineDataset((cityMeta || {}).fakeRetryBaseline, rawSeries.length)].filter(Boolean),
+    [baselineLineDataset((cityMeta || {}).fakeRetryBaseline, rawSeries.length, null, 'PAN India')].filter(Boolean),
     null, 'Fake Retries');
 }
 
@@ -530,7 +534,7 @@ function renderQcCharts(cityMeta, rawSeries, period) {
   // left axis, retry % line on the right, retries/OFD in the tooltip.
   makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0),
     series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %',
-    [baselineLineDataset(cityMeta.retryBaseline, series.length)].filter(Boolean),
+    [baselineLineDataset(cityMeta.retryBaseline, series.length, null, 'PAN India')].filter(Boolean),
     items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`],
     'OFD Orders');
   renderNpsChart(rawSeries, period);
@@ -545,8 +549,8 @@ function renderRiderEfficiencyCharts(labels, series, acceptancePartners) {
   makeMultiLineChart('chartIdleHrs', labels,
     [{ label: 'Avg Idle Hrs', data: series.map(r => r.avgIdleHrs != null ? round1_(r.avgIdleHrs) : null) }], 'Hours', false);
   makeMultiLineChart('chartEfficiency', labels, [
-    { label: 'Efficiency Per Day', data: series.map(r => r.efficiencyPerDay != null ? round1_(r.efficiencyPerDay) : null) },
-    { label: 'Efficiency Per Hour', data: series.map(r => r.efficiencyPerHour != null ? round1_(r.efficiencyPerHour) : null) },
+    { label: 'Order Per Day', data: series.map(r => r.efficiencyPerDay != null ? round1_(r.efficiencyPerDay) : null) },
+    { label: 'Order Per Hour', data: series.map(r => r.efficiencyPerHour != null ? round1_(r.efficiencyPerHour) : null) },
   ], 'Efficiency', false);
   makeMultiLineChart('chartActiveRiders', labels,
     [{ label: 'Active Riders', data: series.map(r => r.activeRiders != null ? round1_(r.activeRiders) : null) }], 'Riders', false);
@@ -592,9 +596,9 @@ function renderStoreCharts(rawSeries, period, acceptancePartners) {
 }
 
 // ======================= STAT PANELS =======================
-function statPanelsHTML(orderSummary, coldChain, ageing, ageingLabel) {
+function statPanelsHTML(orderSummary, coldChain, ageing, ageingLabel, service) {
   const cold = coldChainHTML(coldChain);
-  const ageingCard = ageingHTML(ageing, ageingLabel);
+  const ageingCard = ageingHTML(ageing, ageingLabel, service);
   return `<div class="scorecard-row">
       ${orderSummary ? `
       <div class="scorecard">
@@ -620,7 +624,10 @@ function ageingBucketRag_(bucketKey) {
   return 'rag-red'; // d3, d4d5, gt5
 }
 
-function ageingHTML(ageing, label) {
+// service is threaded through purely so a click can open the right (QC vs
+// Non-QC) full ageing table — this card only ever shows ONE total, the modal
+// is where every city's own breakdown lives.
+function ageingHTML(ageing, label, service) {
   if (!ageing || !ageing.total) return '';
   const pct = n => ageing.total ? ((n / ageing.total) * 100).toFixed(1) + '%' : '0%';
   const rows = [
@@ -631,7 +638,7 @@ function ageingHTML(ageing, label) {
     ['gt5', '&gt;5 days', ageing.gt5],
   ];
   return `
-    <div class="scorecard ageing-scorecard">
+    <div class="scorecard ageing-scorecard clickable-card" onclick="openAgeingModal_('${service}')" title="View the full ageing table by city">
       <div class="scorecard-label"><span class="stat-icon">⏳</span> Ageing Orders ${label ? `<span class="scorecard-date">(${label})</span>` : ''}</div>
       <div class="scorecard-value">${ageing.total.toLocaleString()}</div>
       <div class="cold-breakdown">
@@ -674,7 +681,7 @@ function panIndiaAgeingBarHTML(ageing, service, panIndia) {
       </div>` : ''}
       ${hasAgeing ? `
       <div class="pan-india-divider"></div>
-      <div class="pan-india-metric">
+      <div class="pan-india-metric clickable-card" onclick="openAgeingModal_('${service}')" title="View the full ageing table by city">
         <div class="pan-india-metric-val">${ageing.total.toLocaleString()}</div>
         <div class="pan-india-bucket-label">Ageing &gt; (D-0)</div>
       </div>
@@ -683,7 +690,7 @@ function panIndiaAgeingBarHTML(ageing, service, panIndia) {
         <div class="pan-india-metric-val">${(panIndia.retryPct*100).toFixed(1)}%</div>
         <div class="pan-india-bucket-label"><span class="stat-icon">🔁</span> Current Retry Rate</div>
       </div>` : ''}
-      <div class="pan-india-buckets">
+      <div class="pan-india-buckets clickable-card" onclick="openAgeingModal_('${service}')" title="View the full ageing table by city">
         ${buckets.map(([key, label, val]) => `
           <div class="pan-india-bucket">
             <div class="pan-india-bucket-val ${ageingBucketRag_(key)}-text">${val.toLocaleString()}</div>
@@ -786,11 +793,17 @@ function cityIconHTML_(cityName) {
   return `<svg class="city-icon" viewBox="0 0 24 24" fill="none" stroke="${data.color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${data.path}</svg>`;
 }
 
+// The whole card opens the team's Cold Chain ops sheet in a new tab — same
+// click target whether it's reached from the Home page's Cold Trip Summary
+// or a city page's own Cold Chain Breach scorecard, since they share this
+// one function.
+const COLD_CHAIN_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1O2Wb_W7r3nxFz_6KxhT60FCn2Z0efr_iZnhyXh2RHDw/edit';
+
 function coldChainHTML(coldChain) {
   if (!coldChain) return '';
   const pct = v => (v * 100).toFixed(1) + '%';
   return `
-    <div class="scorecard cold-scorecard">
+    <div class="scorecard cold-scorecard clickable-card" onclick="window.open('${COLD_CHAIN_SHEET_URL}','_blank')" title="Open the Cold Chain ops sheet">
       <div class="scorecard-label"><span class="stat-icon">🌡️</span> Cold Chain Breach <span class="scorecard-date">(${coldChain.dateRange})</span></div>
       <div class="scorecard-value">${pct(coldChain.breachPct)} <span class="scorecard-sub">of ${coldChain.totalTrips} trips</span></div>
       <div class="cold-breakdown">
@@ -809,6 +822,76 @@ function coldChainHTML(coldChain) {
 function coldTripSummaryHomeHTML(grandTotal) {
   if (!grandTotal) return '';
   return `<div class="scorecard-row" style="margin: 6px 0 20px;">${coldChainHTML(grandTotal)}</div>`;
+}
+
+// ======================= AGEING TABLE MODAL =======================
+// Clicking either Ageing card (Home's Pan India bar, or a city page's own
+// Ageing scorecard) opens this — a full per-city breakdown table for
+// whichever service (QC/Non-QC) was actually clicked, not just the single
+// rolled-up number the card itself shows. Backed by a new `?action=ageingtable`
+// endpoint (see Code.gs) since no existing payload carries every city's row.
+// Modal markup is injected into <body> once, on first use, so every page
+// (index/city/explore) gets it without needing its own copy in the HTML.
+function ensureAgeingModal_() {
+  if (document.getElementById('ageingModalOverlay')) return;
+  const div = document.createElement('div');
+  div.id = 'ageingModalOverlay';
+  div.className = 'modal-overlay';
+  div.innerHTML = `
+    <div class="modal-box modal-box-wide">
+      <div class="modal-header">
+        <h3 id="ageingModalTitle">Ageing Orders</h3>
+        <button class="modal-close" onclick="closeAgeingModal_()" aria-label="Close">&times;</button>
+      </div>
+      <div id="ageingModalBody" class="modal-body"><div class="loading">Loading…</div></div>
+    </div>`;
+  document.body.appendChild(div);
+  // Click on the dimmed backdrop (not the box itself) closes it.
+  div.addEventListener('click', (e) => { if (e.target === div) closeAgeingModal_(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAgeingModal_(); });
+}
+
+function closeAgeingModal_() {
+  const el = document.getElementById('ageingModalOverlay');
+  if (el) el.classList.remove('open');
+}
+
+async function openAgeingModal_(service) {
+  service = (service === 'QC') ? 'QC' : 'Non-QC Inhouse';
+  ensureAgeingModal_();
+  const overlay = document.getElementById('ageingModalOverlay');
+  const body = document.getElementById('ageingModalBody');
+  document.getElementById('ageingModalTitle').textContent = `Ageing Orders by City — ${service}`;
+  body.innerHTML = '<div class="loading">Loading…</div>';
+  overlay.classList.add('open');
+  try {
+    const data = await cachedFetchJSON(`${WEBAPP_URL}?action=ageingtable&service=${encodeURIComponent(service)}`, 5 * 60 * 1000);
+    body.innerHTML = ageingTableHTML_(data);
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state">Couldn't load the ageing table: ${err.message}</div>`;
+  }
+}
+
+function ageingTableHTML_(data) {
+  if (!data || data.error) return `<div class="empty-state">Couldn't load the ageing table${data && data.error ? ': ' + data.error : ''}.</div>`;
+  const rows = data.rows || [];
+  if (!rows.length) return '<div class="empty-state">No ageing data for this service yet.</div>';
+  const body = rows.map(r => `
+    <tr>
+      <td class="ageing-table-city">${r.city}</td>
+      <td>${r.total.toLocaleString()}</td>
+      <td>${r.d1.toLocaleString()}</td>
+      <td>${r.d2.toLocaleString()}</td>
+      <td>${r.d3.toLocaleString()}</td>
+      <td>${r.d4.toLocaleString()}</td>
+      <td>${r.d5.toLocaleString()}</td>
+      <td>${r.gt5.toLocaleString()}</td>
+    </tr>`).join('');
+  return `
+    <table class="ageing-table">
+      <thead><tr><th>City</th><th>Total</th><th>D-1</th><th>D-2</th><th>D-3</th><th>D-4</th><th>D-5</th><th>&gt;5 days</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
 }
 
 // ======================= STORE LIST (QC city page) =======================
