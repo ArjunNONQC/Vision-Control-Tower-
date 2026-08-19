@@ -357,6 +357,7 @@ function nonQcChartCardsHTML(cityMeta) {
     <div class="chart-card"><h3><span class="card-dot dot-cancel"></span>Cancellation %</h3><div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>SDD & Faster % Inhouse + 3PL</h3><div class="chart-canvas-wrap"><canvas id="chartSddFaster"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Fake Retry %</h3><div class="chart-canvas-wrap"><canvas id="chartFakeRetry"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-nps"></span>NPS (7d rolling)</h3><div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div></div>
     <div class="section-divider">Queue-Level TAT in Hrs (P80)</div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>Overall TAT</h3><div class="chart-canvas-wrap"><canvas id="chartTatOverall"></canvas></div></div>
@@ -439,6 +440,7 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
     'Placed\u2192ETA (hrs)', 'Hours', tatYOpts);
 
   renderNpsChart(rawSeries, period);
+  renderFakeRetryChart(rawSeries);
 }
 
 // NPS is already a 7-day ROLLING score at source, so re-bucketing it into weeks
@@ -451,6 +453,21 @@ function renderNpsChart(rawSeries, period) {
   makeMultiLineChart('chartNps', labels,
     [{ label: 'NPS (7d rolling)', data: rawSeries.map(r => r.nps != null ? round1_(r.nps) : null) }],
     'NPS', false);
+}
+
+// Fake Retry — Non-QC-only (the source tab has a QC block too, but it's out
+// of scope for this app per request). Always renders from the RAW daily
+// series, ignoring the DoD/WoW toggle, same reasoning as NPS: the sheet gives
+// us the % and a raw count, but not the count's own denominator, so there is
+// no correct way to re-weight this into a proper weekly average — showing the
+// daily values as-is is more honest than computing a plausible-looking wrong
+// one. Bars = fakeRetryCount (a plain count, at least additive — though not
+// shown accumulated since the daily grain never changes); line = fakeRetryPct.
+function renderFakeRetryChart(rawSeries) {
+  const labels = rawSeries.map(r => fmtDayLabel(r.date));
+  makeComboChart('chartFakeRetry', labels, rawSeries.map(r => r.fakeRetryCount ?? 0),
+    rawSeries.map(r => r.fakeRetryPct != null ? round1_(r.fakeRetryPct * 100) : null), 'Fake Retry %',
+    null, null, 'Fake Retries');
 }
 
 function renderQcCharts(cityMeta, rawSeries, period) {
@@ -661,10 +678,12 @@ function schemaWarningHTML(schemaWarnings) {
   const accept = schemaWarnings.qc3pAcceptanceMissingColumns || [];
   const eta = schemaWarnings.nonQcEtaMissingColumns || [];
   const nps = schemaWarnings.npsMissingColumns || [];
+  const coldChain = schemaWarnings.coldChainMissingColumns || [];
   const batching = schemaWarnings.qcBatchingMissingColumns || [];
+  const fakeRetry = schemaWarnings.fakeRetryMissingColumns || [];
   const missingTabs = schemaWarnings.missingTabs || [];
   const joins = schemaWarnings.joinWarnings || [];
-  if (!missingTabs.length && !joins.length && !nq.length && !qc.length && !sdd.length && !canc.length && !noBaseline.length && !eff.length && !accept.length && !eta.length && !nps.length && !batching.length) return '';
+  if (!missingTabs.length && !joins.length && !nq.length && !qc.length && !sdd.length && !canc.length && !noBaseline.length && !eff.length && !accept.length && !eta.length && !nps.length && !coldChain.length && !batching.length && !fakeRetry.length) return '';
   const parts = [];
   // Tab-level failures come first: if the tab itself didn't resolve, every
   // column warning under it is noise.
@@ -678,7 +697,9 @@ function schemaWarningHTML(schemaWarnings) {
   if (accept.length) parts.push(`QC 3P Acceptance Rate: couldn't find column(s) for ${accept.join(', ')}`);
   if (eta.length) parts.push(`NON-QC Eta: couldn't find column(s) for ${eta.join(', ')}`);
   if (nps.length) parts.push(`NPS: couldn't find column(s) for ${nps.join(', ')}`);
+  if (coldChain.length) parts.push(`ColdChainBreach: couldn't find column(s) for ${coldChain.join(', ')}`);
   if (batching.length) parts.push(`QC BATCHING: couldn't find column(s) for ${batching.join(', ')}`);
+  if (fakeRetry.length) parts.push(`Fake Retry: ${fakeRetry.join(', ')}`);
   if (noBaseline.length) parts.push(`Base Config: no matching row for ${noBaseline.join(', ')} — their Breach % baseline won't be drawn until the city name in Base Config exactly matches Dump NONQC`);
   return `<div class="schema-warning">⚠ Sheet column mismatch — ${parts.join(' · ')}. Those fields are reading as 0 until the header names match.</div>`;
 }
@@ -848,6 +869,21 @@ function metricLabel(m) {
   if (s === 'Overall Breach') return 'Overall Breach';
   const cleaned = s.replace(/\s*\(\s*LM\s*Induced\s*\)\s*/i, '').trim();
   return cleaned || 'Long Tail';
+}
+
+// Every cachedFetchJSON entry lives under this prefix (see 'visioncache:' +
+// url above), so sweeping the client side of the cache is just removing every
+// key that starts with it. Used by the home page's Hard Refresh button —
+// clearing the SERVER cache alone isn't enough, because a stale localStorage
+// hit is served without the browser ever making a network call at all.
+function clearAllLocalCache_() {
+  const doomed = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.indexOf('visioncache:') === 0) doomed.push(k);
+  }
+  doomed.forEach(k => localStorage.removeItem(k));
+  return doomed.length;
 }
 
 // ======================= NETWORK (localStorage cache + stale-while-revalidate + retrying) =======================
