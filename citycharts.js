@@ -107,29 +107,31 @@ function baselineLineDataset(value, len, yAxisID, label) {
   };
 }
 
-// ======================= PAN INDIA-DERIVED BASELINES (Retry / Fake Retry) =======================
-// Retry Rate and Fake Retry % have no fixed target in Base Config the way
-// Breach %/Long Tail % do, so their baseline is defined dynamically per
-// request: "today's" Pan India value for that same metric, applied as a flat
-// dashed line across every city's chart (e.g. Pan India retry = 13% on 18
-// Aug -> 13% baseline for every city that day). "Today" here means the most
-// recent date present in Pan India's own raw daily series — the fields are
-// read straight off the row (retryRate / fakeRetryPct), the same fields the
-// per-city charts already plot, so this stays correct even as the sheet
-// grows new days. Best-effort: any fetch failure just means no baseline line
-// is drawn, never a broken page.
+// ======================= PAN INDIA-DERIVED BASELINES (Retry / Fake Retry / Cancellation) =======================
+// Retry Rate, Fake Retry %, and Cancellation % have no fixed target in Base
+// Config the way Breach %/Long Tail % do, so their baseline is defined
+// dynamically per request: "today's" Pan India value for that same metric,
+// applied as a flat dashed line across every city's chart (e.g. Pan India
+// retry = 13% on 18 Aug -> 13% baseline for every city that day). "Today"
+// here means the most recent date present in Pan India's own raw daily
+// series — the fields are read straight off the row (retryRate /
+// fakeRetryPct / cancellationPct), the same fields the per-city charts
+// already plot, so this stays correct even as the sheet grows new days.
+// Best-effort: any fetch failure just means no baseline line is drawn, never
+// a broken page.
 async function fetchPanIndiaRetryBaselines_(service) {
   try {
     const data = await fetchCityData('Pan India', service);
     const series = data && data.series;
-    if (!series || !series.length) return { retryBaseline: null, fakeRetryBaseline: null };
+    if (!series || !series.length) return { retryBaseline: null, fakeRetryBaseline: null, cancellationBaseline: null };
     const last = series[series.length - 1];
     return {
       retryBaseline: last.retryRate != null ? last.retryRate : null,
       fakeRetryBaseline: last.fakeRetryPct != null ? last.fakeRetryPct : null,
+      cancellationBaseline: last.cancellationPct != null ? last.cancellationPct : null,
     };
   } catch (e) {
-    return { retryBaseline: null, fakeRetryBaseline: null };
+    return { retryBaseline: null, fakeRetryBaseline: null, cancellationBaseline: null };
   }
 }
 
@@ -303,7 +305,10 @@ function makeDualLineChart(canvasId, labels, series1, label1, series2, label2, y
 // yOpts (optional): { beginAtZero, stepSize, suffix }. Used by the Queue-Level
 // TAT charts, which are pinned to start at 0 with a fixed 10-unit tick gap so
 // the three of them stay visually comparable to each other.
-function makeSingleLineChart(canvasId, labels, values, label, yLabel, yOpts) {
+// extraLineDatasets (optional): additional Chart.js line datasets drawn on
+// top of the main line — used for the Pan-India baseline overlay (Cancellation
+// %). Must target this chart's own axis id ('y', the default), not 'yPct'.
+function makeSingleLineChart(canvasId, labels, values, label, yLabel, yOpts, extraLineDatasets) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
@@ -318,7 +323,7 @@ function makeSingleLineChart(canvasId, labels, values, label, yLabel, yOpts) {
       datalabels: { display: 'auto', clamp: true, align: ctx => ctx.dataIndex % 2 === 0 ? 'top' : 'bottom',
         offset: 6, color: COLOR.singleLine, font: { size: fs(10), weight: '700' },
         formatter: v => v != null ? round1_(v) + suffix : '' },
-    }]},
+    }, ...(extraLineDatasets || [])]},
     options: {
       responsive: true, maintainAspectRatio: false, layout: { padding: { top: LABEL_PADDING_TOP } }, interaction: { mode: 'index', intersect: false },
       plugins: {
@@ -384,7 +389,7 @@ function nonQcChartCardsHTML(cityMeta) {
   return `
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach % + BBD % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-cancel"></span>Cancellation %</h3><div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-cancel"></span>Cancellation % ${cityMeta.cancellationBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>PAN India ${(cityMeta.cancellationBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>SDD & Faster % Inhouse + 3PL</h3><div class="chart-canvas-wrap"><canvas id="chartSddFaster"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate ${cityMeta.retryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>PAN India ${(cityMeta.retryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Fake Retry % ${cityMeta.fakeRetryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>PAN India ${(cityMeta.fakeRetryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartFakeRetry"></canvas></div></div>
@@ -450,7 +455,8 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
   // Cancellation is a line only — the Orders bars were dropped per request, so
   // this is now a plain % line on a single axis (no order-volume axis at all).
   makeSingleLineChart('chartCancel', labels, series.map(r => round1_(r.cancellationPct * 100)),
-    'Cancellation %', '%', { beginAtZero: true, suffix: '%' });
+    'Cancellation %', '%', { beginAtZero: true, suffix: '%' },
+    [baselineLineDataset(cityMeta.cancellationBaseline, series.length, 'y', 'PAN India')].filter(Boolean));
   makeComboChart('chartSddFaster', labels, series.map(r => r.sddOrders ?? 0),
     series.map(r => r.sddFasterPct != null ? round1_(r.sddFasterPct * 100) : null), 'SDD & Faster %', null);
   // Bars here are OFD orders, not delivered orders — axis + legend say so.
