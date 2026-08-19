@@ -311,7 +311,10 @@ select.control-select {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 16px;
-  font-size: 14px;
+  /* Bumped up from 14px per request — these are the city-tab section
+     headings (3P Acceptance, DM Rider Efficiency, etc.) and were reading too
+     small next to the chart-card h3s around them. */
+  font-size: 18px;
   font-weight: 800;
   color: var(--header-blue);
   text-align: center;
@@ -722,8 +725,31 @@ select.control-select {
   text-transform: uppercase;
   letter-spacing: 0.4px;
   background: #F8FAFC;
+  /* Stays put while the store list scrolls past it. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 .store-row.store-header:hover { background: #F8FAFC; }
+
+/* Clickable column heading — click toggles that column asc/desc. */
+.store-sortable { cursor: pointer; user-select: none; }
+.store-sortable:hover { color: var(--header-blue-2); }
+
+/* Overall roll-up row — pinned directly under the header (also sticky) so it
+   never moves when the rows below it get re-sorted. */
+.store-row.store-overall {
+  cursor: default;
+  font-weight: 700;
+  background: #FBF3F5;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 34px; /* approx. header row height, so it sits directly under it */
+  z-index: 1;
+}
+.store-row.store-overall:hover { background: #FBF3F5; }
+.store-row.store-overall .store-code { color: var(--header-blue); }
 
 .store-code { font-weight: 700; color: var(--header-blue-2); }
 
