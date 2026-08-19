@@ -781,3 +781,94 @@ select.control-select {
   margin-left: 8px;
   vertical-align: middle;
 }
+
+/* ======================= CLICKABLE SUMMARY CARDS ======================= */
+/* Cold Chain Breach card -> opens the Cold Chain ops sheet; Ageing card ->
+   opens the full ageing-by-city modal. Same hover treatment for both so the
+   affordance is consistent wherever a card is clickable. */
+.clickable-card {
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.clickable-card:hover {
+  box-shadow: 0 4px 14px rgba(22, 50, 79, 0.14);
+  transform: translateY(-1px);
+}
+
+/* ======================= MODAL (Ageing table) ======================= */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(22, 35, 46, 0.55);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.modal-overlay.open { display: flex; }
+
+.modal-box {
+  background: var(--card-bg);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(22, 50, 79, 0.28);
+  max-height: 85vh;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-box-wide { max-width: 860px; }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 22px;
+  background: linear-gradient(135deg, var(--header-blue) 0%, var(--header-blue-2) 100%);
+  color: #fff;
+  flex-shrink: 0;
+}
+.modal-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.modal-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.modal-close:hover { background: rgba(255,255,255,0.15); }
+
+.modal-body {
+  padding: 18px 22px 22px;
+  overflow: auto;
+}
+
+.ageing-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ageing-table th, .ageing-table td {
+  padding: 8px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.ageing-table th:first-child, .ageing-table td:first-child { text-align: left; }
+.ageing-table th {
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  background: #F8FAFC;
+  position: sticky;
+  top: 0;
+}
+.ageing-table-city { font-weight: 700; color: var(--header-blue-2); }
+.ageing-table tr:hover td { background: #F5F9FD; }
