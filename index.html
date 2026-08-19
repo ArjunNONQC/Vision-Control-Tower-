@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — City Tracker</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=19" />
+<link rel="stylesheet" href="style.css?v=20" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -33,7 +33,9 @@
     <h1><img src="vision-icon.svg" alt="" class="vision-icon" />Vision — City Tracker</h1>
   </div>
   <div class="controls">
-    <button id="refreshBtn" class="btn-icon-refresh" title="Fetch live data from sheet" onclick="doRefresh()">⟳</button>
+    <button id="refreshBtn" class="btn-icon-refresh" title="Refresh this view only" onclick="doRefresh()">⟳</button>
+    <button id="hardRefreshBtn" class="btn-hard-refresh" title="Clear cache everywhere and reload fresh data for every city and store" onclick="doHardRefresh()">🗑️ Hard Refresh</button>
+    <span id="hardRefreshStatus" class="hard-refresh-status"></span>
     <a class="nav-btn" href="explore.html">All Cities →</a>
     <div class="toggle-group" id="serviceToggle">
       <button data-val="Non-QC Inhouse" class="active">Non-QC</button>
@@ -61,7 +63,7 @@
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=30"></script>
+<script src="citycharts.js?v=32"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -166,6 +168,46 @@ async function doRefresh() {
   btn.disabled = true;
   try { await load(true); }
   finally { btn.classList.remove('spinning'); btn.disabled = false; }
+}
+
+// Hard Refresh: clears BOTH cache layers everywhere — not just the current
+// view — then rebuilds. doRefresh()/load(true) only bypasses the server cache
+// for the ONE payload currently on screen; every other city, store, and the
+// opposite QC/Non-QC toggle keep serving whatever was cached before, which is
+// exactly the "have to load each city individually" gap this button closes.
+async function doHardRefresh() {
+  const btn = document.getElementById('hardRefreshBtn');
+  const status = document.getElementById('hardRefreshStatus');
+  btn.classList.add('spinning');
+  btn.disabled = true;
+  try {
+    status.textContent = 'Clearing cache…';
+    const res = await fetch(`${WEBAPP_URL}?action=hardrefresh`);
+    const result = await res.json();
+    if (result.error) throw new Error(result.error);
+
+    // Server cache is now empty; the client's own copy would otherwise keep
+    // serving stale data straight out of localStorage without a network call.
+    clearAllLocalCache_();
+
+    status.textContent = 'Reloading…';
+    // Resetting the flag BEFORE reload matters: load() -> renderHomeData()
+    // calls startBackgroundPrefetch() at the end of every normal page render,
+    // and that call is a no-op unless prefetchStarted is false. Clearing it
+    // here means THIS reload is what re-arms the walk across every other
+    // city, store, and the opposite QC/Non-QC toggle — no separate call
+    // needed, and no risk of firing the prefetch twice.
+    prefetchStarted = false;
+    await load(true);
+
+    status.textContent = 'Refreshing cities & stores in background…';
+    setTimeout(() => { if (status.textContent.indexOf('background') !== -1) status.textContent = ''; }, 8000);
+  } catch (err) {
+    status.textContent = 'Hard refresh failed: ' + err.message;
+  } finally {
+    btn.classList.remove('spinning');
+    btn.disabled = false;
+  }
 }
 
 function renderHomeData(data) {
