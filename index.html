@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — City Tracker</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=22" />
+<link rel="stylesheet" href="style.css?v=23" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -57,13 +57,13 @@
   <div id="breachGrid" class="card-grid"><div class="loading">Loading…</div></div>
 
   <div class="section-label">As per trend</div>
-  <div id="trendStrip" class="trend-strip"></div>
+  <div id="trendStrip" class="card-grid"></div>
 </div>
 
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=36"></script>
+<script src="citycharts.js?v=37"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -162,6 +162,28 @@ function goToCity(city, service) {
   window.location.href = `city.html?city=${encodeURIComponent(city)}&service=${encodeURIComponent(service)}`;
 }
 
+// "As per trend" mini scorecard — green-themed (nothing here is breaching),
+// showing each tracked metric's actual value against its baseline the same
+// way a breach card does, just without the severity pill/trend arrow (there's
+// no deviation to badge when a city is comfortably under baseline).
+// c.metrics comes from the backend's computeNonQcCityFlags_/computeQcCityFlags_
+// — every city gets it now, not just breaching ones.
+function renderTrendCard(c) {
+  const rows = (c.metrics || []).filter(m => m.actual != null && m.baseline != null).map(m => `
+      <div class="metric-row">
+        <span class="metric-name">${metricLabel(m.metric)}</span>
+        <span class="metric-vals">
+          <span>${fmtPct(m.actual)} <span style="color:var(--text-muted)">vs ${fmtPct(m.baseline)}</span></span>
+        </span>
+      </div>`).join('');
+  return `
+    <div class="city-card good" onclick="goToCity('${c.city}','${c.service}')">
+      <div class="city-name">${cityIconHTML_(c.city)}${c.city}</div>
+      <div class="driven-by">${c.orders != null ? `<span class="card-orders">${c.orders.toLocaleString()} orders</span>` : ''}</div>
+      ${rows}
+    </div>`;
+}
+
 async function load(force) {
   document.getElementById('breachGrid').innerHTML = '<div class="loading">Loading…</div>';
   document.getElementById('trendStrip').innerHTML = '';
@@ -247,12 +269,15 @@ function renderHomeData(data) {
     document.getElementById('panIndiaAgeing').innerHTML =
       panIndiaAgeingBarHTML(data.ageing, data.service, data.panIndia);
 
-    document.getElementById('coldTripSummary').innerHTML = coldTripSummaryHomeHTML(data.coldChainGrandTotal);
+    document.getElementById('coldTripSummary').innerHTML = coldTripSummaryHomeHTML(data.coldChainGrandTotal, data);
 
     renderPanIndiaAcceptance(data);
 
     const grid = document.getElementById('breachGrid');
-    const panCard = panIndiaCardHTML(data);
+    // Pan India now lives in the top summary row next to Cold Chain, not in
+    // this grid — it isn't really a "city" that can breach against its own
+    // baseline, it's the national rollup, so it never belonged in a list
+    // titled "Needs attention" in the first place.
     // ROI is filtered out of every list, QC and Non-QC alike. "Needs
     // attention" is then ordered by order volume (descending), not by
     // breach % — the busiest city surfaces first regardless of how far over
@@ -260,20 +285,16 @@ function renderHomeData(data) {
     const citiesForGrid = data.cities
       .filter(c => !isExcludedCity_(c.city))
       .sort((a, b) => (b.orders || 0) - (a.orders || 0));
-    if (!citiesForGrid.length) {
-      grid.innerHTML = panCard || '<div class="empty-state">No breached cities in this view.</div>';
-    } else {
-      grid.innerHTML = panCard + citiesForGrid.map(renderBreachCard).join('');
-    }
+    grid.innerHTML = citiesForGrid.length
+      ? citiesForGrid.map(renderBreachCard).join('')
+      : '<div class="empty-state">No breached cities in this view.</div>';
 
     const trendCities = data.asPerTrend.filter(c => !isExcludedCity_(c.city));
     const strip = document.getElementById('trendStrip');
     if (!trendCities.length) {
       strip.innerHTML = '<div class="empty-state">—</div>';
     } else {
-      strip.innerHTML = trendCities.map(c =>
-        `<div class="trend-chip" onclick="goToCity('${c.city}','${c.service}')">${cityIconHTML_(c.city)}${c.city}${c.orders != null ? `<span class="chip-orders">${c.orders.toLocaleString()}</span>` : ''}</div>`
-      ).join('');
+      strip.innerHTML = trendCities.map(renderTrendCard).join('');
     }
 
     startBackgroundPrefetch();
