@@ -103,6 +103,32 @@ function baselineLineDataset(value, len, yAxisID) {
   };
 }
 
+// ======================= PAN INDIA-DERIVED BASELINES (Retry / Fake Retry) =======================
+// Retry Rate and Fake Retry % have no fixed target in Base Config the way
+// Breach %/Long Tail % do, so their baseline is defined dynamically per
+// request: "today's" Pan India value for that same metric, applied as a flat
+// dashed line across every city's chart (e.g. Pan India retry = 13% on 18
+// Aug -> 13% baseline for every city that day). "Today" here means the most
+// recent date present in Pan India's own raw daily series — the fields are
+// read straight off the row (retryRate / fakeRetryPct), the same fields the
+// per-city charts already plot, so this stays correct even as the sheet
+// grows new days. Best-effort: any fetch failure just means no baseline line
+// is drawn, never a broken page.
+async function fetchPanIndiaRetryBaselines_(service) {
+  try {
+    const data = await fetchCityData('Pan India', service);
+    const series = data && data.series;
+    if (!series || !series.length) return { retryBaseline: null, fakeRetryBaseline: null };
+    const last = series[series.length - 1];
+    return {
+      retryBaseline: last.retryRate != null ? last.retryRate : null,
+      fakeRetryBaseline: last.fakeRetryPct != null ? last.fakeRetryPct : null,
+    };
+  } catch (e) {
+    return { retryBaseline: null, fakeRetryBaseline: null };
+  }
+}
+
 // Shared tooltip look — nothing on the chart itself is ever a static label;
 // every value (the metric, Orders, Baseline, all of it) only appears here,
 // on hover. This is the one thing that can never collide, at any data
@@ -356,8 +382,8 @@ function nonQcChartCardsHTML(cityMeta) {
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-cancel"></span>Cancellation %</h3><div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>SDD & Faster % Inhouse + 3PL</h3><div class="chart-canvas-wrap"><canvas id="chartSddFaster"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Fake Retry %</h3><div class="chart-canvas-wrap"><canvas id="chartFakeRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate ${cityMeta.retryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.retryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Fake Retry % ${cityMeta.fakeRetryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.fakeRetryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartFakeRetry"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-nps"></span>NPS (7d rolling)</h3><div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div></div>
     <div class="section-divider">Queue-Level TAT in Hrs (P80)</div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>Overall TAT</h3><div class="chart-canvas-wrap"><canvas id="chartTatOverall"></canvas></div></div>
@@ -374,7 +400,7 @@ function qcChartCardsHTML(cityMeta) {
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD%</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (min)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate ${cityMeta.retryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.retryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-nps"></span>NPS (7d rolling)</h3><div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div></div>
     ${riderEfficiencyCardsHTML()}`;
 }
@@ -394,13 +420,12 @@ function storeChartCardsHTML() {
 // and 3P-partner-acceptance charts, same card markup either way.
 function riderEfficiencyCardsHTML() {
   return `
-    <div class="section-divider">Rider Efficiency</div>
+    <div class="section-divider">DM Rider Efficiency</div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>Active Hrs</h3><div class="chart-canvas-wrap"><canvas id="chartActiveHrs"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>Idle Hrs</h3><div class="chart-canvas-wrap"><canvas id="chartIdleHrs"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-share"></span>Efficiency Per Day / Per Hour</h3><div class="chart-canvas-wrap"><canvas id="chartEfficiency"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Active Riders</h3><div class="chart-canvas-wrap"><canvas id="chartActiveRiders"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>Mg Eligible %</h3><div class="chart-canvas-wrap"><canvas id="chartMgEligible"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-cancel"></span>% Not Hitting Upper Threshold</h3><div class="chart-canvas-wrap"><canvas id="chartUpperThreshold"></canvas></div></div>
+    <div class="chart-card span-2"><h3><span class="card-dot dot-sdd"></span>Mg Eligible % / % Not Hitting Upper Threshold</h3><div class="chart-canvas-wrap"><canvas id="chartMgEligible"></canvas></div></div>
     <div class="section-divider">3P Partner Acceptance</div>
     <div class="chart-card span-2"><h3><span class="card-dot dot-share"></span>Acceptance Rate by Partner</h3><div class="chart-canvas-wrap"><canvas id="chartAcceptance"></canvas></div></div>`;
 }
@@ -417,7 +442,7 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
     series.map(r => round1_(r.bddPct * 100)), 'BBD %',
     cityMeta.overallBreachBaseline);
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
-    [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean));
+    [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean), null, 'Delivered Order');
   // Cancellation is a line only — the Orders bars were dropped per request, so
   // this is now a plain % line on a single axis (no order-volume axis at all).
   makeSingleLineChart('chartCancel', labels, series.map(r => round1_(r.cancellationPct * 100)),
@@ -425,7 +450,8 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
   makeComboChart('chartSddFaster', labels, series.map(r => r.sddOrders ?? 0),
     series.map(r => r.sddFasterPct != null ? round1_(r.sddFasterPct * 100) : null), 'SDD & Faster %', null);
   // Bars here are OFD orders, not delivered orders — axis + legend say so.
-  makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %', null,
+  makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %',
+    [baselineLineDataset(cityMeta.retryBaseline, series.length)].filter(Boolean),
     items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`],
     'OFD Orders');
 
@@ -440,7 +466,7 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
     'Placed\u2192ETA (hrs)', 'Hours', tatYOpts);
 
   renderNpsChart(rawSeries, period);
-  renderFakeRetryChart(rawSeries);
+  renderFakeRetryChart(rawSeries, cityMeta);
 }
 
 // NPS is already a 7-day ROLLING score at source, so re-bucketing it into weeks
@@ -463,11 +489,12 @@ function renderNpsChart(rawSeries, period) {
 // daily values as-is is more honest than computing a plausible-looking wrong
 // one. Bars = fakeRetryCount (a plain count, at least additive — though not
 // shown accumulated since the daily grain never changes); line = fakeRetryPct.
-function renderFakeRetryChart(rawSeries) {
+function renderFakeRetryChart(rawSeries, cityMeta) {
   const labels = rawSeries.map(r => fmtDayLabel(r.date));
   makeComboChart('chartFakeRetry', labels, rawSeries.map(r => r.fakeRetryCount ?? 0),
     rawSeries.map(r => r.fakeRetryPct != null ? round1_(r.fakeRetryPct * 100) : null), 'Fake Retry %',
-    null, null, 'Fake Retries');
+    [baselineLineDataset((cityMeta || {}).fakeRetryBaseline, rawSeries.length)].filter(Boolean),
+    null, 'Fake Retries');
 }
 
 function renderQcCharts(cityMeta, rawSeries, period) {
@@ -497,12 +524,13 @@ function renderQcCharts(cityMeta, rawSeries, period) {
     series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach with Tol %',
     series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %');
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
-    [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean));
+    [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean), null, 'Delivered Order');
   makeSingleLineChart('chartLmTat', labels, series.map(r => r.p80LmTat), 'P80 LM TAT (min)', 'Minutes');
   // QC Retry Rate — same construction as the Non-QC one: OFD orders on the
   // left axis, retry % line on the right, retries/OFD in the tooltip.
   makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0),
-    series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %', null,
+    series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %',
+    [baselineLineDataset(cityMeta.retryBaseline, series.length)].filter(Boolean),
     items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`],
     'OFD Orders');
   renderNpsChart(rawSeries, period);
@@ -522,10 +550,12 @@ function renderRiderEfficiencyCharts(labels, series, acceptancePartners) {
   ], 'Efficiency', false);
   makeMultiLineChart('chartActiveRiders', labels,
     [{ label: 'Active Riders', data: series.map(r => r.activeRiders != null ? round1_(r.activeRiders) : null) }], 'Riders', false);
-  makeMultiLineChart('chartMgEligible', labels,
-    [{ label: 'Mg Eligible %', data: series.map(r => r.mgEligiblePct != null ? round1_(r.mgEligiblePct * 100) : null) }], '%', true);
-  makeMultiLineChart('chartUpperThreshold', labels,
-    [{ label: '% Not Hitting Upper Threshold', data: series.map(r => r.pctNotHittingUpperThreshold != null ? round1_(r.pctNotHittingUpperThreshold * 100) : null) }], '%', true);
+  // Merged per request: Mg Eligible % and % Not Hitting Upper Threshold now
+  // share one chart/one canvas instead of two separate cards.
+  makeMultiLineChart('chartMgEligible', labels, [
+    { label: 'Mg Eligible %', data: series.map(r => r.mgEligiblePct != null ? round1_(r.mgEligiblePct * 100) : null) },
+    { label: '% Not Hitting Upper Threshold', data: series.map(r => r.pctNotHittingUpperThreshold != null ? round1_(r.pctNotHittingUpperThreshold * 100) : null) },
+  ], '%', true);
   makeMultiLineChart('chartAcceptance', labels,
     acceptancePartners.map(p => ({
       label: p,
@@ -555,7 +585,7 @@ function renderStoreCharts(rawSeries, period, acceptancePartners) {
     series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach with Tol %',
     series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %');
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
-    [baselineLineDataset(0.04, series.length)].filter(Boolean));
+    [baselineLineDataset(0.04, series.length)].filter(Boolean), null, 'Delivered Order');
   makeSingleLineChart('chartLmTat', labels, series.map(r => r.p80LmTat), 'P80 LM TAT (min)', 'Minutes');
 
   renderRiderEfficiencyCharts(labels, series, acceptancePartners);
@@ -742,6 +772,14 @@ const CITY_ICON_DATA = {
 
 const CITY_ICON_FALLBACK = { color: '#6B7C8C', path: '<path d="M4 21V10l4-2 4 2v11M12 21V6l4-2 4 2v15M4 21h16"/>' };
 
+// "ROI" is being pulled entirely off the dashboard per request — a non-city
+// rollup that shouldn't appear as its own card/tile anywhere, QC or Non-QC.
+// Centralized here so every list (home grid, trend strip, Explore dropdown,
+// background prefetch) filters it the same way.
+function isExcludedCity_(name) {
+  return (name || '').toString().trim().toUpperCase() === 'ROI';
+}
+
 function cityIconHTML_(cityName) {
   const key = (cityName || '').toString().trim().toUpperCase();
   const data = CITY_ICON_DATA[key] || CITY_ICON_FALLBACK;
@@ -794,29 +832,114 @@ function trendDirectionHTML(trend) {
   return `<span style="color:var(--red);font-size:12px;font-weight:700;">↓ Worsening</span>`;
 }
 
-function storeListHTML(storesPayload) {
-  if (!storesPayload || storesPayload.error || !storesPayload.stores.length) return '';
-  const cityParam = encodeURIComponent(storesPayload.city);
-  const rows = storesPayload.stores.map(s => `
-    <div class="store-row" onclick="window.location.href='store.html?store=${encodeURIComponent(s.storeCode)}&city=${cityParam}'">
+// Column definitions for the store list — key is the field on each store
+// object to sort by (null = not sortable, e.g. Trend has no single scalar to
+// compare). Label text lives here so header + sort logic can't drift apart.
+const STORE_LIST_COLUMNS = [
+  { key: 'storeCode',        label: 'Store',        sortable: true },
+  { key: null,               label: 'Trend',        sortable: false },
+  { key: 'totalOrders',      label: 'Total Orders', sortable: true },
+  { key: 'breachWithTolPct', label: 'Breach %',     sortable: true },
+  { key: 'ltPct',            label: 'Long Tail %',  sortable: true },
+  { key: 'dmSharePct',       label: 'DM Share',     sortable: true },
+  { key: 'tpSharePct',       label: '3P Share',     sortable: true },
+  { key: 'activeRiders',     label: 'Active Riders',sortable: true },
+  { key: 'p80LmTat',         label: 'TAT (mins)',   sortable: true }, // was mislabeled "(hrs)" — p80LmTat is minutes, same field the LM TAT chart already titles "(min)"
+];
+
+function storeRowCellsHTML_(s) {
+  return `
       <span class="store-code">${s.storeCode}</span>
-      <span>${trendDirectionHTML(s.trend)}</span>
-      <span>${s.totalOrders.toLocaleString()}</span>
-      <span>${(s.breachWithTolPct*100).toFixed(1)}%</span>
+      <span>${s.trend ? trendDirectionHTML(s.trend) : '—'}</span>
+      <span>${s.totalOrders != null ? Number(s.totalOrders).toLocaleString() : '—'}</span>
+      <span>${s.breachWithTolPct != null ? (s.breachWithTolPct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.ltPct != null ? (s.ltPct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.dmSharePct != null ? (s.dmSharePct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.tpSharePct != null ? (s.tpSharePct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.activeRiders != null ? Number(s.activeRiders).toLocaleString() : '—'}</span>
-      <span>${s.p80LmTat != null ? Number(s.p80LmTat).toFixed(1) : '—'}</span>
-    </div>`).join('');
+      <span>${s.p80LmTat != null ? Number(s.p80LmTat).toFixed(1) : '—'}</span>`;
+}
+
+// Order-weighted rollup of every store into one "Overall" row (the backend
+// payload doesn't hand back a ready-made total). Percentages are weighted by
+// each store's totalOrders so a small store's noisy % doesn't skew the city
+// figure; Active Riders and Total Orders are plain sums; TAT is a simple
+// average across stores that reported a value (P80 doesn't sum meaningfully).
+function computeStoreOverallRow_(stores) {
+  const totalOrders = stores.reduce((s, r) => s + (r.totalOrders || 0), 0);
+  const wavg = (field) => {
+    let num = 0, den = 0;
+    stores.forEach(r => { if (r[field] != null) { num += r[field] * (r.totalOrders || 0); den += (r.totalOrders || 0); } });
+    return den ? num / den : null;
+  };
+  const avg = (field) => {
+    const vals = stores.map(r => r[field]).filter(v => v != null);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  };
+  return {
+    storeCode: 'Overall', trend: null, totalOrders,
+    breachWithTolPct: wavg('breachWithTolPct'),
+    ltPct: wavg('ltPct'), dmSharePct: wavg('dmSharePct'), tpSharePct: wavg('tpSharePct'),
+    activeRiders: stores.reduce((s, r) => s + (r.activeRiders || 0), 0),
+    p80LmTat: avg('p80LmTat'),
+  };
+}
+
+let _storeListPayload = null;
+let _storeListSort = { key: null, dir: 1 }; // dir: 1 = ascending, -1 = descending
+
+// Re-sorts and redraws in place — bound to each sortable header's onclick.
+// Clicking the same column again flips direction; clicking a new column
+// starts it ascending. The Overall row and header never move.
+function sortStoreList_(key) {
+  if (!key) return;
+  if (_storeListSort.key === key) _storeListSort.dir *= -1;
+  else _storeListSort = { key, dir: 1 };
+  const holder = document.getElementById('storeListHolder');
+  if (holder) holder.innerHTML = renderStoreListInner_();
+}
+
+function renderStoreListInner_() {
+  const storesPayload = _storeListPayload;
+  if (!storesPayload || storesPayload.error || !storesPayload.stores.length) return '';
+  const cityParam = encodeURIComponent(storesPayload.city);
+  let stores = storesPayload.stores.slice();
+  if (_storeListSort.key) {
+    const key = _storeListSort.key, dir = _storeListSort.dir;
+    stores.sort((a, b) => {
+      let av = a[key], bv = b[key];
+      if (typeof av === 'string' || typeof bv === 'string') {
+        return dir * (av || '').toString().localeCompare((bv || '').toString());
+      }
+      av = av == null ? -Infinity : av;
+      bv = bv == null ? -Infinity : bv;
+      return dir * (av - bv);
+    });
+  }
+  const headerCells = STORE_LIST_COLUMNS.map(col => {
+    if (!col.sortable) return `<span>${col.label}</span>`;
+    const arrow = _storeListSort.key === col.key ? (_storeListSort.dir === 1 ? ' \u25B2' : ' \u25BC') : '';
+    return `<span class="store-sortable" onclick="sortStoreList_('${col.key}')">${col.label}${arrow}</span>`;
+  }).join('');
+  const overallRow = `<div class="store-row store-overall">${storeRowCellsHTML_(computeStoreOverallRow_(storesPayload.stores))}</div>`;
+  const rows = stores.map(s => `
+    <div class="store-row" onclick="window.location.href='store.html?store=${encodeURIComponent(s.storeCode)}&city=${cityParam}'">${storeRowCellsHTML_(s)}</div>`).join('');
   return `
     <div class="section-label">Stores in ${storesPayload.city} <span style="font-weight:500;text-transform:none;">(as of ${fmtDayLabel(storesPayload.asOf)})</span></div>
     <div class="store-list">
-      <div class="store-row store-header">
-        <span>Store</span><span>Trend</span><span>Total Orders</span><span>Breach %</span><span>Long Tail %</span><span>DM Share</span><span>3P Share</span><span>Active Riders</span><span>TAT (hrs)</span>
-      </div>
+      <div class="store-row store-header">${headerCells}</div>
+      ${overallRow}
       ${rows}
     </div>`;
+}
+
+// Entry point called by city.html/explore.html — stashes the payload (sort
+// clicks re-render from this without refetching) and resets any sort left
+// over from a previously viewed city.
+function storeListHTML(storesPayload) {
+  _storeListPayload = storesPayload;
+  _storeListSort = { key: null, dir: 1 };
+  return renderStoreListInner_();
 }
 
 // ======================= PAN INDIA CITY CARD =======================
@@ -1021,7 +1144,7 @@ async function prefetchAllCitiesAndStores(currentService, currentPeriod) {
 
     ['QC', 'Non-QC Inhouse'].forEach(svc => tasks.push(() => fetchCityData('Pan India', svc)));
 
-    (byService['QC'] || []).forEach(city => {
+    (byService['QC'] || []).filter(city => !isExcludedCity_(city)).forEach(city => {
       tasks.push(() => fetchCityData(city, 'QC'));
       tasks.push(async () => {
         const sd = await fetchStoresData(city);
@@ -1030,7 +1153,7 @@ async function prefetchAllCitiesAndStores(currentService, currentPeriod) {
         }
       });
     });
-    (byService['Non-QC Inhouse'] || []).forEach(city => {
+    (byService['Non-QC Inhouse'] || []).filter(city => !isExcludedCity_(city)).forEach(city => {
       tasks.push(() => fetchCityData(city, 'Non-QC Inhouse'));
     });
 
