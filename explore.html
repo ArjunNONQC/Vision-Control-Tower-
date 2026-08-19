@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — Explore All Cities</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=20" />
+<link rel="stylesheet" href="style.css?v=21" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -18,7 +18,7 @@
 
 <div class="topbar">
   <div>
-    <a class="nav-btn" href="index.html">← Vision Home</a>
+    <a class="nav-btn" id="homeLink" href="index.html">← Vision Home</a>
     <h1><img src="vision-icon.svg" alt="" class="vision-icon" />Explore — All Cities</h1>
   </div>
   <div class="controls">
@@ -45,7 +45,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=33"></script>
+<script src="citycharts.js?v=34"></script>
 <script>
 let period = 'DoD';
 let service = 'Non-QC Inhouse';
@@ -63,15 +63,21 @@ document.getElementById('periodToggle').addEventListener('click', (e) => {
   if (rawSeries) renderForService();
 });
 
+function updateHomeLink_() {
+  document.getElementById('homeLink').href = `index.html?service=${encodeURIComponent(service)}`;
+}
+
 serviceSelect.addEventListener('change', () => {
   service = serviceSelect.value;
+  updateHomeLink_();
   populateCityDropdown(service);
   loadSelectedCity();
 });
 citySelect.addEventListener('change', loadSelectedCity);
+updateHomeLink_();
 
 function populateCityDropdown(svc) {
-  const cities = citiesByService[svc] || [];
+  const cities = (citiesByService[svc] || []).filter(c => !isExcludedCity_(c));
   citySelect.innerHTML = cities.length
     ? cities.map(c => `<option value="${c}">${c}</option>`).join('')
     : '<option>No cities found</option>';
@@ -113,12 +119,23 @@ async function doRefresh() {
   finally { btn.classList.remove('spinning'); btn.disabled = false; }
 }
 
-function renderExploreData(data) {
+async function renderExploreData(data) {
   cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
   rawSeries = data.series;
   document.getElementById('diagBanner').innerHTML = schemaWarningHTML(data.schemaWarnings);
   document.getElementById('scorecardHolder').innerHTML =
     statPanelsHTML(data.orderSummary, data.coldChain, data.ageing, data.ageing ? 'D-1, latest' : null);
+  document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
+  renderForService();
+
+  // Retry Rate / Fake Retry % baselines = Pan India's own current-day value
+  // for that metric — see the note in city.html for why this is a second,
+  // non-blocking fetch rather than part of the main city payload.
+  const thisRawSeries = rawSeries;
+  const { retryBaseline, fakeRetryBaseline } = await fetchPanIndiaRetryBaselines_(service);
+  if (rawSeries !== thisRawSeries) return; // user switched city/service while this was in flight
+  cityMeta.retryBaseline = retryBaseline;
+  cityMeta.fakeRetryBaseline = fakeRetryBaseline;
   document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
   renderForService();
 }
