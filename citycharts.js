@@ -124,11 +124,23 @@ async function fetchPanIndiaRetryBaselines_(service) {
     const data = await fetchCityData('Pan India', service);
     const series = data && data.series;
     if (!series || !series.length) return { retryBaseline: null, fakeRetryBaseline: null, cancellationBaseline: null };
-    const last = series[series.length - 1];
+    // Walk backward from the most recent day to the first day that actually
+    // has a value for each field, rather than assuming the very last row is
+    // populated. A source tab can legitimately have a blank cell for today
+    // (not refreshed yet, no trips that day, etc.) while still having a
+    // perfectly good value from yesterday — taking strictly the last row
+    // silently drops the whole baseline in that case, even though the
+    // underlying series has real data one day back.
+    const lastNonNull = field => {
+      for (let i = series.length - 1; i >= 0; i--) {
+        if (series[i][field] != null) return series[i][field];
+      }
+      return null;
+    };
     return {
-      retryBaseline: last.retryRate != null ? last.retryRate : null,
-      fakeRetryBaseline: last.fakeRetryPct != null ? last.fakeRetryPct : null,
-      cancellationBaseline: last.cancellationPct != null ? last.cancellationPct : null,
+      retryBaseline: lastNonNull('retryRate'),
+      fakeRetryBaseline: lastNonNull('fakeRetryPct'),
+      cancellationBaseline: lastNonNull('cancellationPct'),
     };
   } catch (e) {
     return { retryBaseline: null, fakeRetryBaseline: null, cancellationBaseline: null };
@@ -390,7 +402,7 @@ function nonQcChartCardsHTML(cityMeta) {
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach % + BBD % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-cancel"></span>Cancellation % ${cityMeta.cancellationBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>PAN India ${(cityMeta.cancellationBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>SDD & Faster % Inhouse + 3PL</h3><div class="chart-canvas-wrap"><canvas id="chartSddFaster"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>SDD & Faster % Inhouse + 3PL ${cityMeta.sddFasterBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.sddFasterBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartSddFaster"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate ${cityMeta.retryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>PAN India ${(cityMeta.retryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Fake Retry % ${cityMeta.fakeRetryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>PAN India ${(cityMeta.fakeRetryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartFakeRetry"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-nps"></span>NPS (7d rolling)</h3><div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div></div>
@@ -458,7 +470,8 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
     'Cancellation %', '%', { beginAtZero: true, suffix: '%' },
     [baselineLineDataset(cityMeta.cancellationBaseline, series.length, 'y', 'PAN India')].filter(Boolean));
   makeComboChart('chartSddFaster', labels, series.map(r => r.sddOrders ?? 0),
-    series.map(r => r.sddFasterPct != null ? round1_(r.sddFasterPct * 100) : null), 'SDD & Faster %', null);
+    series.map(r => r.sddFasterPct != null ? round1_(r.sddFasterPct * 100) : null), 'SDD & Faster %',
+    [baselineLineDataset(cityMeta.sddFasterBaseline, series.length)].filter(Boolean));
   // Bars here are OFD orders, not delivered orders — axis + legend say so.
   makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %',
     [baselineLineDataset(cityMeta.retryBaseline, series.length, null, 'PAN India')].filter(Boolean),
