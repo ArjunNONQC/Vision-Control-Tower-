@@ -45,7 +45,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=37"></script>
+<script src="citycharts.js?v=38"></script>
 <script>
 let period = 'DoD';
 let service = 'Non-QC Inhouse';
@@ -120,7 +120,7 @@ async function doRefresh() {
 }
 
 async function renderExploreData(data) {
-  cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline };
+  cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline, sddFasterBaseline: data.sddFasterBaseline };
   rawSeries = data.series;
   document.getElementById('diagBanner').innerHTML = schemaWarningHTML(data.schemaWarnings);
   document.getElementById('scorecardHolder').innerHTML =
