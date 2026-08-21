@@ -823,7 +823,7 @@ function coldChainHTML(coldChain) {
   const pct = v => (v * 100).toFixed(1) + '%';
   return `
     <div class="scorecard cold-scorecard clickable-card" onclick="window.open('${COLD_CHAIN_SHEET_URL}','_blank')" title="Open the Cold Chain ops sheet">
-      <div class="scorecard-label"><span class="stat-icon">🌡️</span> Cold Chain Breach <span class="scorecard-date">(${coldChain.dateRange})</span></div>
+      <div class="scorecard-label"><span class="stat-icon">🌡️</span> Cold Chain Breach with 5min tol% <span class="scorecard-date">(${coldChain.dateRange})</span></div>
       <div class="scorecard-value">${pct(coldChain.breachPct)} <span class="scorecard-sub">of ${coldChain.totalTrips} trips</span></div>
       <div class="cold-breakdown">
         <div class="cold-bar-row"><span class="cold-bar-label">High only (&gt;8&deg;C)</span><div class="cold-bar-track"><div class="cold-bar-fill high" style="width:${(coldChain.highOnlyPct*100).toFixed(1)}%"></div></div><span class="cold-bar-val">${coldChain.highOnly} (${pct(coldChain.highOnlyPct)})</span></div>
