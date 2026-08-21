@@ -42,7 +42,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=37"></script>
+<script src="citycharts.js?v=38"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const CITY = params.get('city');
@@ -108,7 +108,7 @@ async function doRefresh() {
 }
 
 async function renderCityData(data) {
-  cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline, acceptancePartners: data.acceptancePartners || [] };
+  cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline, sddFasterBaseline: data.sddFasterBaseline, acceptancePartners: data.acceptancePartners || [] };
   rawSeries = data.series;
   document.getElementById('cityTitle').textContent = `${CITY} — ${service}`;
   document.getElementById('diagBanner').innerHTML = schemaWarningHTML(data.schemaWarnings);
