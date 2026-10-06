@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — Store Detail</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=23" />
+<link rel="stylesheet" href="style.css?v=21" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -18,7 +18,7 @@
 
 <div class="topbar">
   <div>
-    <a class="nav-btn" href="index.html?service=QC">← Vision Home</a>
+    <a class="nav-btn" href="index.html">← Vision Home</a>
     <span id="backToCity"></span>
     <h1><img src="vision-icon.svg" alt="" class="vision-icon" /><span id="storeTitle">Loading…</span></h1>
   </div>
@@ -36,7 +36,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=40"></script>
+<script src="citycharts.js?v=34"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const STORE_CODE = params.get('store');
@@ -44,13 +44,14 @@ const CITY_HINT = params.get('city');
 let period = 'DoD';
 let rawSeries = null;
 let acceptancePartners = [];
+let weeklySeries = null; // completed weeks from the WoW sheet
 
 document.getElementById('periodToggle').addEventListener('click', (e) => {
   if (e.target.tagName !== 'BUTTON') return;
   [...e.currentTarget.children].forEach(b => b.classList.remove('active'));
   e.target.classList.add('active');
   period = e.target.dataset.val;
-  renderStoreCharts(rawSeries, period, acceptancePartners);
+  renderStoreCharts(rawSeries, period, acceptancePartners, weeklySeries);
 });
 
 async function load(force) {
@@ -73,12 +74,13 @@ async function doRefresh() {
 
 function renderStoreData(data) {
   rawSeries = data.series;
+  weeklySeries = data.weeklySeries;
   acceptancePartners = data.acceptancePartners || [];
   document.getElementById('storeTitle').textContent = `${data.storeCode} — ${data.city} (QC)`;
   document.getElementById('backToCity').innerHTML =
     `<a class="nav-btn" href="city.html?city=${encodeURIComponent(data.city)}&service=QC" style="margin-right:8px;">← Back to ${data.city}</a>`;
   document.getElementById('chartGrid').innerHTML = storeChartCardsHTML();
-  renderStoreCharts(rawSeries, period, acceptancePartners);
+  renderStoreCharts(rawSeries, period, acceptancePartners, weeklySeries);
 }
 load();
 </script>
