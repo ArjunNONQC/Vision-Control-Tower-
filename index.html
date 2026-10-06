@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — City Tracker</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=23" />
+<link rel="stylesheet" href="style.css?v=21" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -63,7 +63,7 @@
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=40"></script>
+<script src="citycharts.js?v=34"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -73,13 +73,7 @@ function initLock() {
   const input = document.getElementById('lockInput');
   const errorEl = document.getElementById('lockError');
 
-  // localStorage (not sessionStorage) — sessionStorage is scoped per tab, so
-  // navigating back from a city page in a way the browser treats as a "new"
-  // browsing context (a new tab, or a mobile browser that discards session
-  // storage when backgrounded) re-triggered the lock screen. localStorage is
-  // shared across tabs/windows for this origin and survives that, so once
-  // unlocked it stays unlocked until the browser's site data is cleared.
-  if (localStorage.getItem(LOCK_KEY) === '1') {
+  if (sessionStorage.getItem(LOCK_KEY) === '1') {
     lockScreen.style.display = 'none';
     appRoot.style.display = 'block';
     load();
@@ -88,7 +82,7 @@ function initLock() {
 
   function tryUnlock() {
     if (input.value === DASHBOARD_PASSWORD) {
-      localStorage.setItem(LOCK_KEY, '1');
+      sessionStorage.setItem(LOCK_KEY, '1');
       lockScreen.style.display = 'none';
       appRoot.style.display = 'block';
       load();
@@ -104,14 +98,7 @@ function initLock() {
   input.focus();
 }
 
-// Deep-linked from a city/store/explore page via ?service=... so coming back
-// to "Vision Home" from a QC city lands on the QC home view (and Non-QC on
-// Non-QC), instead of always resetting to Non-QC.
-const requestedService = new URLSearchParams(window.location.search).get('service');
-const state = { service: requestedService === 'QC' ? 'QC' : 'Non-QC Inhouse', period: 'DoD' };
-[...document.getElementById('serviceToggle').children].forEach(b => {
-  b.classList.toggle('active', b.dataset.val === state.service);
-});
+const state = { service: 'Non-QC Inhouse', period: 'DoD' };
 
 document.getElementById('serviceToggle').addEventListener('click', (e) => {
   if (e.target.tagName !== 'BUTTON') return;
@@ -137,51 +124,46 @@ function fmtPct(v) { return (v * 100).toFixed(1) + '%'; }
 
 function renderBreachCard(c) {
   const sevClass = c.breaches[0].severity; // dominant severity for the left border
-  const rows = c.breaches.map(b => {
-    const arrow = b.trend === 'worsening' ? '▲' : (b.trend === 'improving' ? '▼' : '—');
+  return `
+    <div class="city-card ${sevClass}" onclick="goToCity('${c.city}','${c.service}')">
+      <div class="city-name">${cityIconHTML_(c.city)}${c.city}</div>
+      <div class="driven-by">Driven by: ${metricLabel(c.drivenBy)}${c.orders != null ? ` <span class="card-orders">\u00b7 ${c.orders.toLocaleString()} orders</span>` : ''}</div>
+      ${metricRowsHTML_(c.breaches)}
+    </div>`;
+}
+
+// As-per-trend cities get the same full card as a breaching one, showing the
+// current Overall Breach / Long Tail against baseline. Nothing is over baseline
+// here (that is what "as per trend" means), so there is no "driven by" - the
+// backend sends both metrics for every city in allMetrics.
+function renderAsPerTrendCard(c) {
+  return `
+    <div class="city-card green" onclick="goToCity('${c.city}','${c.service}')">
+      <div class="city-name">${cityIconHTML_(c.city)}${c.city}</div>
+      <div class="driven-by">On track${c.orders != null ? ` <span class="card-orders">\u00b7 ${c.orders.toLocaleString()} orders</span>` : ''}</div>
+      ${metricRowsHTML_(c.allMetrics || [])}
+    </div>`;
+}
+
+// deviationPct is signed: > 0 is over baseline (bad), <= 0 at/under (good).
+function metricRowsHTML_(metrics) {
+  return metrics.map(b => {
+    const arrow = b.trend === 'worsening' ? '\u25b2' : (b.trend === 'improving' ? '\u25bc' : '\u2014');
+    const dev = Math.round(b.deviationPct * 100);
     return `
       <div class="metric-row">
         <span class="metric-name">${metricLabel(b.metric)}</span>
         <span class="metric-vals">
           <span>${fmtPct(b.actual)} <span style="color:var(--text-muted)">vs ${fmtPct(b.baseline)}</span></span>
-          <span class="pill ${b.severity}">+${(b.deviationPct*100).toFixed(0)}%</span>
+          <span class="pill ${b.severity}">${dev > 0 ? '+' : ''}${dev}%</span>
           <span class="trend-arrow ${b.trend}" title="${b.trend}, ${Math.abs(b.trendDeltaPts).toFixed(1)}pt vs prior period">${arrow}</span>
         </span>
       </div>`;
   }).join('');
-
-  return `
-    <div class="city-card ${sevClass}" onclick="goToCity('${c.city}','${c.service}')">
-      <div class="city-name">${cityIconHTML_(c.city)}${c.city}</div>
-      <div class="driven-by">Driven by: ${metricLabel(c.drivenBy)}${c.orders != null ? ` <span class="card-orders">· ${c.orders.toLocaleString()} orders</span>` : ''}</div>
-      ${rows}
-    </div>`;
 }
 
 function goToCity(city, service) {
   window.location.href = `city.html?city=${encodeURIComponent(city)}&service=${encodeURIComponent(service)}`;
-}
-
-// "As per trend" mini scorecard — green-themed (nothing here is breaching),
-// showing each tracked metric's actual value against its baseline the same
-// way a breach card does, just without the severity pill/trend arrow (there's
-// no deviation to badge when a city is comfortably under baseline).
-// c.metrics comes from the backend's computeNonQcCityFlags_/computeQcCityFlags_
-// — every city gets it now, not just breaching ones.
-function renderTrendCard(c) {
-  const rows = (c.metrics || []).filter(m => m.actual != null && m.baseline != null).map(m => `
-      <div class="metric-row">
-        <span class="metric-name">${metricLabel(m.metric)}</span>
-        <span class="metric-vals">
-          <span>${fmtPct(m.actual)} <span style="color:var(--text-muted)">vs ${fmtPct(m.baseline)}</span></span>
-        </span>
-      </div>`).join('');
-  return `
-    <div class="city-card good" onclick="goToCity('${c.city}','${c.service}')">
-      <div class="city-name">${cityIconHTML_(c.city)}${c.city}</div>
-      <div class="driven-by">${c.orders != null ? `<span class="card-orders">${c.orders.toLocaleString()} orders</span>` : ''}</div>
-      ${rows}
-    </div>`;
 }
 
 async function load(force) {
@@ -269,32 +251,23 @@ function renderHomeData(data) {
     document.getElementById('panIndiaAgeing').innerHTML =
       panIndiaAgeingBarHTML(data.ageing, data.service, data.panIndia);
 
-    document.getElementById('coldTripSummary').innerHTML = coldTripSummaryHomeHTML(data.coldChainGrandTotal, data);
+    document.getElementById('coldTripSummary').innerHTML = coldTripSummaryHomeHTML(data.coldChainGrandTotal);
 
     renderPanIndiaAcceptance(data);
 
     const grid = document.getElementById('breachGrid');
-    // Pan India now lives in the top summary row next to Cold Chain, not in
-    // this grid — it isn't really a "city" that can breach against its own
-    // baseline, it's the national rollup, so it never belonged in a list
-    // titled "Needs attention" in the first place.
-    // ROI is filtered out of every list, QC and Non-QC alike. "Needs
-    // attention" is then ordered by order volume (descending), not by
-    // breach % — the busiest city surfaces first regardless of how far over
-    // its baseline it is.
-    const citiesForGrid = data.cities
-      .filter(c => !isExcludedCity_(c.city))
-      .sort((a, b) => (b.orders || 0) - (a.orders || 0));
-    grid.innerHTML = citiesForGrid.length
-      ? citiesForGrid.map(renderBreachCard).join('')
-      : '<div class="empty-state">No breached cities in this view.</div>';
+    const panCard = panIndiaCardHTML(data);
+    if (!data.cities.length) {
+      grid.innerHTML = panCard || '<div class="empty-state">No breached cities in this view.</div>';
+    } else {
+      grid.innerHTML = panCard + data.cities.map(renderBreachCard).join('');
+    }
 
-    const trendCities = data.asPerTrend.filter(c => !isExcludedCity_(c.city));
     const strip = document.getElementById('trendStrip');
-    if (!trendCities.length) {
+    if (!data.asPerTrend.length) {
       strip.innerHTML = '<div class="empty-state">—</div>';
     } else {
-      strip.innerHTML = trendCities.map(renderTrendCard).join('');
+      strip.innerHTML = data.asPerTrend.map(renderAsPerTrendCard).join('');
     }
 
     startBackgroundPrefetch();
@@ -325,7 +298,7 @@ function renderPanIndiaAcceptance(data) {
       <h3><span class="card-dot dot-share"></span>3P Partner Acceptance Rate — Pan India</h3>
       <div class="chart-canvas-wrap"><canvas id="chartAcceptancePanIndia"></canvas></div>
     </div>`;
-  const labels = ap.dates.map(d => fmtDayLabel(d));
+  const labels = ap.dates.map(d => ap.isWeekly ? fmtWeekLabel(d) : fmtDayLabel(d));
   makeMultiLineChart('chartAcceptancePanIndia', labels,
     ap.partners.map(p => ({
       label: p,
