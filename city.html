@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — City Detail</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=23" />
+<link rel="stylesheet" href="style.css?v=21" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -18,7 +18,7 @@
 
 <div class="topbar">
   <div>
-    <a class="nav-btn" id="homeLink" href="index.html">← Vision Home</a>
+    <a class="nav-btn" href="index.html">← Vision Home</a>
     <h1><img src="vision-icon.svg" alt="" class="vision-icon" /><span id="cityTitle">Loading…</span></h1>
   </div>
   <div class="controls">
@@ -42,32 +42,24 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=40"></script>
+<script src="citycharts.js?v=34"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const CITY = params.get('city');
 let service = params.get('service') || 'Non-QC Inhouse';
 let period = 'DoD';
-let cityMeta = {}, rawSeries = null;
+let cityMeta = {}, rawSeries = null, cityData = null;
 
 document.getElementById('cityTitle').textContent = CITY;
 [...document.getElementById('serviceToggle').children].forEach(b => {
   b.classList.toggle('active', b.dataset.val === service);
 });
 
-// So "← Vision Home" from a QC city lands on the QC home view (and Non-QC on
-// Non-QC), instead of always resetting to Non-QC.
-function updateHomeLink_() {
-  document.getElementById('homeLink').href = `index.html?service=${encodeURIComponent(service)}`;
-}
-updateHomeLink_();
-
 document.getElementById('serviceToggle').addEventListener('click', (e) => {
   if (e.target.tagName !== 'BUTTON') return;
   [...e.currentTarget.children].forEach(b => b.classList.remove('active'));
   e.target.classList.add('active');
   service = e.target.dataset.val;
-  updateHomeLink_();
   load();
 });
 document.getElementById('periodToggle').addEventListener('click', (e) => {
@@ -75,8 +67,19 @@ document.getElementById('periodToggle').addEventListener('click', (e) => {
   [...e.currentTarget.children].forEach(b => b.classList.remove('active'));
   e.target.classList.add('active');
   period = e.target.dataset.val;
+  renderScorecards(); // the cold chain card has a WoW version too
   renderForService();
 });
+
+// Cold chain: the WoW toggle shows the WoW sheet's tab, DoD the daily one.
+// ('coldChainWeekly' missing = a payload cached before it existed -> daily.)
+function renderScorecards() {
+  if (!cityData) return;
+  const cold = (period === 'WoW' && 'coldChainWeekly' in cityData) ? cityData.coldChainWeekly : cityData.coldChain;
+  const ageingLabel = cityData.ageing ? 'D-1, latest' : null;
+  document.getElementById('scorecardHolder').innerHTML =
+    statPanelsHTML(cityData.orderSummary, cold, cityData.ageing, ageingLabel);
+}
 
 function renderForService() {
   if (service === 'QC') renderQcCharts(cityMeta, rawSeries, period);
@@ -107,31 +110,19 @@ async function doRefresh() {
   finally { btn.classList.remove('spinning'); btn.disabled = false; }
 }
 
-async function renderCityData(data) {
-  cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline, sddFasterBaseline: data.sddFasterBaseline, acceptancePartners: data.acceptancePartners || [] };
+function renderCityData(data) {
+  cityData = data;
+  // weeklySeries MUST be carried here: the chart renderers read the WoW sheet's
+  // weekly rows from cityMeta, and fall back to re-bucketing daily numbers without it.
+  cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline, acceptancePartners: data.acceptancePartners || [], weeklySeries: data.weeklySeries };
   rawSeries = data.series;
   document.getElementById('cityTitle').textContent = `${CITY} — ${service}`;
   document.getElementById('diagBanner').innerHTML = schemaWarningHTML(data.schemaWarnings);
 
-  const ageingLabel = data.ageing ? 'D-1, latest' : null;
-  document.getElementById('scorecardHolder').innerHTML =
-    statPanelsHTML(data.orderSummary, data.coldChain, data.ageing, ageingLabel, service);
+  renderScorecards();
 
   document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
   renderForService();
-
-  // Retry Rate / Fake Retry % / Cancellation % baselines = Pan India's own
-  // current-day value for that metric. Fetched separately (usually served
-  // instantly from the background prefetch cache) and only re-rendered once
-  // it resolves, so the rest of the page never waits on it.
-  const { retryBaseline, fakeRetryBaseline, cancellationBaseline } = await fetchPanIndiaRetryBaselines_(service);
-  if (cityMeta.retryBaseline !== retryBaseline || cityMeta.fakeRetryBaseline !== fakeRetryBaseline || cityMeta.cancellationBaseline !== cancellationBaseline) {
-    cityMeta.retryBaseline = retryBaseline;
-    cityMeta.fakeRetryBaseline = fakeRetryBaseline;
-    cityMeta.cancellationBaseline = cancellationBaseline;
-    document.getElementById('chartGrid').innerHTML = service === 'QC' ? qcChartCardsHTML(cityMeta) : nonQcChartCardsHTML(cityMeta);
-    renderForService();
-  }
 }
 load();
 </script>
