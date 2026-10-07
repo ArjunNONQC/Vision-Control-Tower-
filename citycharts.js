@@ -54,7 +54,7 @@ const Y_GRACE = '12%';
 const LABEL_PADDING_TOP = 26;
 
 // WoW figures come from the WoW sheet (the backend sends them as weeklySeries,
-// one row per completed week, date = the Monday that starts it). Re-bucketing the
+// one row per COMPLETED week, date = the Monday that starts it). Re-bucketing the
 // daily rows is only a fallback for a payload cached before that field existed -
 // an EMPTY weeklySeries is a real answer ("no completed weeks"), not a reason to
 // quietly substitute differently-sourced numbers.
@@ -102,14 +102,58 @@ function toWeekly(series, pctFields, avgFields) {
   });
 }
 
-function baselineLineDataset(value, len, yAxisID) {
+// label defaults to 'Baseline' (the fixed Base-Config/QC targets); the
+// Retry Rate / Fake Retry % callers below pass 'PAN India' instead, since
+// that line is literally today's Pan India value for that metric, not a
+// fixed target — the legend/tooltip text says so.
+function baselineLineDataset(value, len, yAxisID, label) {
   if (value == null) return null;
   return {
-    type: 'line', label: 'Baseline', yAxisID: yAxisID || 'yPct',
+    type: 'line', label: label || 'Baseline', yAxisID: yAxisID || 'yPct',
     data: Array(len).fill(round1_(value * 100)),
     borderColor: COLOR.baseline, borderDash: [6, 4], pointRadius: 0, borderWidth: 2, fill: false,
     datalabels: { display: false },
   };
+}
+
+// ======================= PAN INDIA-DERIVED BASELINES (Retry / Fake Retry / Cancellation) =======================
+// Retry Rate, Fake Retry %, and Cancellation % have no fixed target in Base
+// Config the way Breach %/Long Tail % do, so their baseline is defined
+// dynamically per request: "today's" Pan India value for that same metric,
+// applied as a flat dashed line across every city's chart (e.g. Pan India
+// retry = 13% on 18 Aug -> 13% baseline for every city that day). "Today"
+// here means the most recent date present in Pan India's own raw daily
+// series — the fields are read straight off the row (retryRate /
+// fakeRetryPct / cancellationPct), the same fields the per-city charts
+// already plot, so this stays correct even as the sheet grows new days.
+// Best-effort: any fetch failure just means no baseline line is drawn, never
+// a broken page.
+async function fetchPanIndiaRetryBaselines_(service) {
+  try {
+    const data = await fetchCityData('Pan India', service);
+    const series = data && data.series;
+    if (!series || !series.length) return { retryBaseline: null, fakeRetryBaseline: null, cancellationBaseline: null };
+    // Walk backward from the most recent day to the first day that actually
+    // has a value for each field, rather than assuming the very last row is
+    // populated. A source tab can legitimately have a blank cell for today
+    // (not refreshed yet, no trips that day, etc.) while still having a
+    // perfectly good value from yesterday — taking strictly the last row
+    // silently drops the whole baseline in that case, even though the
+    // underlying series has real data one day back.
+    const lastNonNull = field => {
+      for (let i = series.length - 1; i >= 0; i--) {
+        if (series[i][field] != null) return series[i][field];
+      }
+      return null;
+    };
+    return {
+      retryBaseline: lastNonNull('retryRate'),
+      fakeRetryBaseline: lastNonNull('fakeRetryPct'),
+      cancellationBaseline: lastNonNull('cancellationPct'),
+    };
+  } catch (e) {
+    return { retryBaseline: null, fakeRetryBaseline: null, cancellationBaseline: null };
+  }
 }
 
 // Shared tooltip look — nothing on the chart itself is ever a static label;
@@ -282,7 +326,10 @@ function makeDualLineChart(canvasId, labels, series1, label1, series2, label2, y
 // yOpts (optional): { beginAtZero, stepSize, suffix }. Used by the Queue-Level
 // TAT charts, which are pinned to start at 0 with a fixed 10-unit tick gap so
 // the three of them stay visually comparable to each other.
-function makeSingleLineChart(canvasId, labels, values, label, yLabel, yOpts) {
+// extraLineDatasets (optional): additional Chart.js line datasets drawn on
+// top of the main line — used for the Pan-India baseline overlay (Cancellation
+// %). Must target this chart's own axis id ('y', the default), not 'yPct'.
+function makeSingleLineChart(canvasId, labels, values, label, yLabel, yOpts, extraLineDatasets) {
   if (charts[canvasId]) charts[canvasId].destroy();
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
@@ -297,7 +344,7 @@ function makeSingleLineChart(canvasId, labels, values, label, yLabel, yOpts) {
       datalabels: { display: 'auto', clamp: true, align: ctx => ctx.dataIndex % 2 === 0 ? 'top' : 'bottom',
         offset: 6, color: COLOR.singleLine, font: { size: fs(10), weight: '700' },
         formatter: v => v != null ? round1_(v) + suffix : '' },
-    }]},
+    }, ...(extraLineDatasets || [])]},
     options: {
       responsive: true, maintainAspectRatio: false, layout: { padding: { top: LABEL_PADDING_TOP } }, interaction: { mode: 'index', intersect: false },
       plugins: {
@@ -363,10 +410,10 @@ function nonQcChartCardsHTML(cityMeta) {
   return `
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach % + BBD % ${cityMeta.overallBreachBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.overallBreachBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-cancel"></span>Cancellation %</h3><div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>SDD & Faster % Inhouse + 3PL</h3><div class="chart-canvas-wrap"><canvas id="chartSddFaster"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Fake Retry %</h3><div class="chart-canvas-wrap"><canvas id="chartFakeRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-cancel"></span>Cancellation % ${cityMeta.cancellationBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>PAN India ${(cityMeta.cancellationBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartCancel"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>SDD & Faster % Inhouse + 3PL ${cityMeta.sddFasterBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.sddFasterBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartSddFaster"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate ${cityMeta.retryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>PAN India ${(cityMeta.retryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Fake Retry % ${cityMeta.fakeRetryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>PAN India ${(cityMeta.fakeRetryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartFakeRetry"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-nps"></span>NPS (7d rolling)</h3><div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div></div>
     <div class="section-divider">Queue-Level TAT in Hrs (P80)</div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>Overall TAT</h3><div class="chart-canvas-wrap"><canvas id="chartTatOverall"></canvas></div></div>
@@ -383,7 +430,7 @@ function qcChartCardsHTML(cityMeta) {
     <div class="chart-card"><h3><span class="card-dot dot-breach"></span>Breach with Tol% + BBD%</h3><div class="chart-canvas-wrap"><canvas id="chartBreachBdd"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-lt"></span>Long Tail % ${cityMeta.ltBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>Baseline ${(cityMeta.ltBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartLT"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>P80 LM TAT (min)</h3><div class="chart-canvas-wrap"><canvas id="chartLmTat"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Retry Rate ${cityMeta.retryBaseline != null ? `<span class="baseline-legend"><span class="baseline-swatch"></span>PAN India ${(cityMeta.retryBaseline*100).toFixed(1)}%</span>` : ''}</h3><div class="chart-canvas-wrap"><canvas id="chartRetry"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-nps"></span>NPS (7d rolling)</h3><div class="chart-canvas-wrap"><canvas id="chartNps"></canvas></div></div>
     ${riderEfficiencyCardsHTML()}`;
 }
@@ -403,13 +450,12 @@ function storeChartCardsHTML() {
 // and 3P-partner-acceptance charts, same card markup either way.
 function riderEfficiencyCardsHTML() {
   return `
-    <div class="section-divider">Rider Efficiency</div>
+    <div class="section-divider">DM Rider Efficiency</div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>Active Hrs</h3><div class="chart-canvas-wrap"><canvas id="chartActiveHrs"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-tat"></span>Idle Hrs</h3><div class="chart-canvas-wrap"><canvas id="chartIdleHrs"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-share"></span>Efficiency Per Day / Per Hour</h3><div class="chart-canvas-wrap"><canvas id="chartEfficiency"></canvas></div></div>
     <div class="chart-card"><h3><span class="card-dot dot-retry"></span>Active Riders</h3><div class="chart-canvas-wrap"><canvas id="chartActiveRiders"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-sdd"></span>Mg Eligible %</h3><div class="chart-canvas-wrap"><canvas id="chartMgEligible"></canvas></div></div>
-    <div class="chart-card"><h3><span class="card-dot dot-cancel"></span>% Not Hitting Upper Threshold</h3><div class="chart-canvas-wrap"><canvas id="chartUpperThreshold"></canvas></div></div>
+    <div class="chart-card span-2"><h3><span class="card-dot dot-sdd"></span>Mg Eligible % / % Not Hitting Upper Threshold</h3><div class="chart-canvas-wrap"><canvas id="chartMgEligible"></canvas></div></div>
     <div class="section-divider">3P Partner Acceptance</div>
     <div class="chart-card span-2"><h3><span class="card-dot dot-share"></span>Acceptance Rate by Partner</h3><div class="chart-canvas-wrap"><canvas id="chartAcceptance"></canvas></div></div>`;
 }
@@ -426,15 +472,18 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
     series.map(r => round1_(r.bddPct * 100)), 'BBD %',
     cityMeta.overallBreachBaseline);
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
-    [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean));
+    [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean), null, 'Delivered Order');
   // Cancellation is a line only — the Orders bars were dropped per request, so
   // this is now a plain % line on a single axis (no order-volume axis at all).
   makeSingleLineChart('chartCancel', labels, series.map(r => round1_(r.cancellationPct * 100)),
-    'Cancellation %', '%', { beginAtZero: true, suffix: '%' });
+    'Cancellation %', '%', { beginAtZero: true, suffix: '%' },
+    [baselineLineDataset(cityMeta.cancellationBaseline, series.length, 'y', 'PAN India')].filter(Boolean));
   makeComboChart('chartSddFaster', labels, series.map(r => r.sddOrders ?? 0),
-    series.map(r => r.sddFasterPct != null ? round1_(r.sddFasterPct * 100) : null), 'SDD & Faster %', null);
+    series.map(r => r.sddFasterPct != null ? round1_(r.sddFasterPct * 100) : null), 'SDD & Faster %',
+    [baselineLineDataset(cityMeta.sddFasterBaseline, series.length)].filter(Boolean));
   // Bars here are OFD orders, not delivered orders — axis + legend say so.
-  makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %', null,
+  makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0), series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %',
+    [baselineLineDataset(cityMeta.retryBaseline, series.length, null, 'PAN India')].filter(Boolean),
     items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`],
     'OFD Orders');
 
@@ -449,7 +498,7 @@ function renderNonQcCharts(cityMeta, rawSeries, period) {
     'Placed\u2192ETA (hrs)', 'Hours', tatYOpts);
 
   renderNpsChart((period === 'WoW' && Array.isArray(cityMeta.weeklySeries)) ? series : rawSeries, period);
-  renderFakeRetryChart(rawSeries);
+  renderFakeRetryChart(rawSeries, cityMeta);
 }
 
 // NPS is already a 7-day ROLLING score at source, so re-bucketing it into weeks
@@ -472,11 +521,12 @@ function renderNpsChart(rawSeries, period) {
 // daily values as-is is more honest than computing a plausible-looking wrong
 // one. Bars = fakeRetryCount (a plain count, at least additive — though not
 // shown accumulated since the daily grain never changes); line = fakeRetryPct.
-function renderFakeRetryChart(rawSeries) {
+function renderFakeRetryChart(rawSeries, cityMeta) {
   const labels = rawSeries.map(r => fmtDayLabel(r.date));
   makeComboChart('chartFakeRetry', labels, rawSeries.map(r => r.fakeRetryCount ?? 0),
     rawSeries.map(r => r.fakeRetryPct != null ? round1_(r.fakeRetryPct * 100) : null), 'Fake Retry %',
-    null, null, 'Fake Retries');
+    [baselineLineDataset((cityMeta || {}).fakeRetryBaseline, rawSeries.length, null, 'PAN India')].filter(Boolean),
+    null, 'Fake Retries');
 }
 
 function renderQcCharts(cityMeta, rawSeries, period) {
@@ -506,12 +556,13 @@ function renderQcCharts(cityMeta, rawSeries, period) {
     series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach with Tol %',
     series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %');
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
-    [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean));
+    [baselineLineDataset(cityMeta.ltBaseline, series.length)].filter(Boolean), null, 'Delivered Order');
   makeSingleLineChart('chartLmTat', labels, series.map(r => r.p80LmTat), 'P80 LM TAT (min)', 'Minutes');
   // QC Retry Rate — same construction as the Non-QC one: OFD orders on the
   // left axis, retry % line on the right, retries/OFD in the tooltip.
   makeComboChart('chartRetry', labels, series.map(r => r.ofdOrders ?? 0),
-    series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %', null,
+    series.map(r => r.retryRate != null ? round1_(r.retryRate * 100) : null), 'Retry %',
+    [baselineLineDataset(cityMeta.retryBaseline, series.length, null, 'PAN India')].filter(Boolean),
     items => [`Retries: ${series[items[0].dataIndex].retries ?? '\u2014'} of ${series[items[0].dataIndex].ofdOrders ?? '\u2014'} OFD orders`],
     'OFD Orders');
   renderNpsChart((period === 'WoW' && Array.isArray(cityMeta.weeklySeries)) ? series : rawSeries, period);
@@ -526,15 +577,17 @@ function renderRiderEfficiencyCharts(labels, series, acceptancePartners) {
   makeMultiLineChart('chartIdleHrs', labels,
     [{ label: 'Avg Idle Hrs', data: series.map(r => r.avgIdleHrs != null ? round1_(r.avgIdleHrs) : null) }], 'Hours', false);
   makeMultiLineChart('chartEfficiency', labels, [
-    { label: 'Efficiency Per Day', data: series.map(r => r.efficiencyPerDay != null ? round1_(r.efficiencyPerDay) : null) },
-    { label: 'Efficiency Per Hour', data: series.map(r => r.efficiencyPerHour != null ? round1_(r.efficiencyPerHour) : null) },
+    { label: 'Order Per Day', data: series.map(r => r.efficiencyPerDay != null ? round1_(r.efficiencyPerDay) : null) },
+    { label: 'Order Per Hour', data: series.map(r => r.efficiencyPerHour != null ? round1_(r.efficiencyPerHour) : null) },
   ], 'Efficiency', false);
   makeMultiLineChart('chartActiveRiders', labels,
     [{ label: 'Active Riders', data: series.map(r => r.activeRiders != null ? round1_(r.activeRiders) : null) }], 'Riders', false);
-  makeMultiLineChart('chartMgEligible', labels,
-    [{ label: 'Mg Eligible %', data: series.map(r => r.mgEligiblePct != null ? round1_(r.mgEligiblePct * 100) : null) }], '%', true);
-  makeMultiLineChart('chartUpperThreshold', labels,
-    [{ label: '% Not Hitting Upper Threshold', data: series.map(r => r.pctNotHittingUpperThreshold != null ? round1_(r.pctNotHittingUpperThreshold * 100) : null) }], '%', true);
+  // Merged per request: Mg Eligible % and % Not Hitting Upper Threshold now
+  // share one chart/one canvas instead of two separate cards.
+  makeMultiLineChart('chartMgEligible', labels, [
+    { label: 'Mg Eligible %', data: series.map(r => r.mgEligiblePct != null ? round1_(r.mgEligiblePct * 100) : null) },
+    { label: '% Not Hitting Upper Threshold', data: series.map(r => r.pctNotHittingUpperThreshold != null ? round1_(r.pctNotHittingUpperThreshold * 100) : null) },
+  ], '%', true);
   makeMultiLineChart('chartAcceptance', labels,
     acceptancePartners.map(p => ({
       label: p,
@@ -564,16 +617,16 @@ function renderStoreCharts(rawSeries, period, acceptancePartners, weeklySeries) 
     series.map(r => round1_(r.breachWithTolPct * 100)), 'Breach with Tol %',
     series.map(r => round1_(r.bbdBreachPct * 100)), 'BBD %');
   makeComboChart('chartLT', labels, orders, series.map(r => round1_(r.ltPct * 100)), 'Long Tail %',
-    [baselineLineDataset(0.04, series.length)].filter(Boolean));
+    [baselineLineDataset(0.04, series.length)].filter(Boolean), null, 'Delivered Order');
   makeSingleLineChart('chartLmTat', labels, series.map(r => r.p80LmTat), 'P80 LM TAT (min)', 'Minutes');
 
   renderRiderEfficiencyCharts(labels, series, acceptancePartners);
 }
 
 // ======================= STAT PANELS =======================
-function statPanelsHTML(orderSummary, coldChain, ageing, ageingLabel) {
+function statPanelsHTML(orderSummary, coldChain, ageing, ageingLabel, service) {
   const cold = coldChainHTML(coldChain);
-  const ageingCard = ageingHTML(ageing, ageingLabel);
+  const ageingCard = ageingHTML(ageing, ageingLabel, service);
   return `<div class="scorecard-row">
       ${orderSummary ? `
       <div class="scorecard">
@@ -599,7 +652,10 @@ function ageingBucketRag_(bucketKey) {
   return 'rag-red'; // d3, d4d5, gt5
 }
 
-function ageingHTML(ageing, label) {
+// service is threaded through purely so a click can open the right (QC vs
+// Non-QC) full ageing table — this card only ever shows ONE total, the modal
+// is where every city's own breakdown lives.
+function ageingHTML(ageing, label, service) {
   if (!ageing || !ageing.total) return '';
   const pct = n => ageing.total ? ((n / ageing.total) * 100).toFixed(1) + '%' : '0%';
   const rows = [
@@ -610,7 +666,7 @@ function ageingHTML(ageing, label) {
     ['gt5', '&gt;5 days', ageing.gt5],
   ];
   return `
-    <div class="scorecard ageing-scorecard">
+    <div class="scorecard ageing-scorecard clickable-card" onclick="openAgeingModal_('${service}')" title="View the full ageing table by city">
       <div class="scorecard-label"><span class="stat-icon">⏳</span> Ageing Orders ${label ? `<span class="scorecard-date">(${label})</span>` : ''}</div>
       <div class="scorecard-value">${ageing.total.toLocaleString()}</div>
       <div class="cold-breakdown">
@@ -653,7 +709,7 @@ function panIndiaAgeingBarHTML(ageing, service, panIndia) {
       </div>` : ''}
       ${hasAgeing ? `
       <div class="pan-india-divider"></div>
-      <div class="pan-india-metric">
+      <div class="pan-india-metric clickable-card" onclick="openAgeingModal_('${service}')" title="View the full ageing table by city">
         <div class="pan-india-metric-val">${ageing.total.toLocaleString()}</div>
         <div class="pan-india-bucket-label">Ageing &gt; (D-0)</div>
       </div>
@@ -662,7 +718,7 @@ function panIndiaAgeingBarHTML(ageing, service, panIndia) {
         <div class="pan-india-metric-val">${(panIndia.retryPct*100).toFixed(1)}%</div>
         <div class="pan-india-bucket-label"><span class="stat-icon">🔁</span> Current Retry Rate</div>
       </div>` : ''}
-      <div class="pan-india-buckets">
+      <div class="pan-india-buckets clickable-card" onclick="openAgeingModal_('${service}')" title="View the full ageing table by city">
         ${buckets.map(([key, label, val]) => `
           <div class="pan-india-bucket">
             <div class="pan-india-bucket-val ${ageingBucketRag_(key)}-text">${val.toLocaleString()}</div>
@@ -753,18 +809,32 @@ const CITY_ICON_DATA = {
 
 const CITY_ICON_FALLBACK = { color: '#6B7C8C', path: '<path d="M4 21V10l4-2 4 2v11M12 21V6l4-2 4 2v15M4 21h16"/>' };
 
+// "ROI" is being pulled entirely off the dashboard per request — a non-city
+// rollup that shouldn't appear as its own card/tile anywhere, QC or Non-QC.
+// Centralized here so every list (home grid, trend strip, Explore dropdown,
+// background prefetch) filters it the same way.
+function isExcludedCity_(name) {
+  return (name || '').toString().trim().toUpperCase() === 'ROI';
+}
+
 function cityIconHTML_(cityName) {
   const key = (cityName || '').toString().trim().toUpperCase();
   const data = CITY_ICON_DATA[key] || CITY_ICON_FALLBACK;
   return `<svg class="city-icon" viewBox="0 0 24 24" fill="none" stroke="${data.color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${data.path}</svg>`;
 }
 
+// The whole card opens the team's Cold Chain ops sheet in a new tab — same
+// click target whether it's reached from the Home page's Cold Trip Summary
+// or a city page's own Cold Chain Breach scorecard, since they share this
+// one function.
+const COLD_CHAIN_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1O2Wb_W7r3nxFz_6KxhT60FCn2Z0efr_iZnhyXh2RHDw/edit';
+
 function coldChainHTML(coldChain) {
   if (!coldChain) return '';
   const pct = v => (v * 100).toFixed(1) + '%';
   return `
-    <div class="scorecard cold-scorecard">
-      <div class="scorecard-label"><span class="stat-icon">🌡️</span> Cold Chain Breach <span class="scorecard-date">(${coldChain.dateRange})</span></div>
+    <div class="scorecard cold-scorecard clickable-card" onclick="window.open('${COLD_CHAIN_SHEET_URL}','_blank')" title="Open the Cold Chain ops sheet">
+      <div class="scorecard-label"><span class="stat-icon">🌡️</span> Cold Chain Breach with 5min tol% <span class="scorecard-date">(${coldChain.dateRange})</span></div>
       <div class="scorecard-value">${pct(coldChain.breachPct)} <span class="scorecard-sub">of ${coldChain.totalTrips} trips</span></div>
       <div class="cold-breakdown">
         <div class="cold-bar-row"><span class="cold-bar-label">High only (&gt;8&deg;C)</span><div class="cold-bar-track"><div class="cold-bar-fill high" style="width:${(coldChain.highOnlyPct*100).toFixed(1)}%"></div></div><span class="cold-bar-val">${coldChain.highOnly} (${pct(coldChain.highOnlyPct)})</span></div>
@@ -774,14 +844,93 @@ function coldChainHTML(coldChain) {
     </div>`;
 }
 
-// Home page's Cold Trip Summary — same card markup as the per-city cold-chain
-// scorecard (coldChainHTML), just fed the sheet's Grand Total row instead of a
-// city row and wrapped in its own row so it doesn't crowd the order/ageing
-// scorecards on the city page. Renders nothing if the tab has no Grand Total
-// row, rather than a misleading "0 trips" card.
-function coldTripSummaryHomeHTML(grandTotal) {
-  if (!grandTotal) return '';
-  return `<div class="scorecard-row" style="margin: 6px 0 20px;">${coldChainHTML(grandTotal)}</div>`;
+// Home page's top row: Cold Trip Summary (same card markup as the per-city
+// cold-chain scorecard, fed the sheet's Grand Total row) sitting next to the
+// Pan India card — moved here from "Needs attention" per request, since Pan
+// India isn't really a city that can "breach" against its own baseline, it's
+// the national rollup. Renders whichever of the two is actually available;
+// if neither is, the row collapses to nothing rather than leaving a gap.
+function coldTripSummaryHomeHTML(grandTotal, panData) {
+  const cold = grandTotal ? coldChainHTML(grandTotal) : '';
+  const pan = panData ? (panIndiaCardHTML(panData) || '') : '';
+  if (!cold && !pan) return '';
+  return `<div class="scorecard-row top-summary-row" style="margin: 6px 0 20px;">${cold}${pan}</div>`;
+}
+
+// ======================= AGEING TABLE MODAL =======================
+// Clicking either Ageing card (Home's Pan India bar, or a city page's own
+// Ageing scorecard) opens this — a full per-city breakdown table for
+// whichever service (QC/Non-QC) was actually clicked, not just the single
+// rolled-up number the card itself shows. Backed by a new `?action=ageingtable`
+// endpoint (see Code.gs) since no existing payload carries every city's row.
+// Modal markup is injected into <body> once, on first use, so every page
+// (index/city/explore) gets it without needing its own copy in the HTML.
+function ensureAgeingModal_() {
+  if (document.getElementById('ageingModalOverlay')) return;
+  const div = document.createElement('div');
+  div.id = 'ageingModalOverlay';
+  div.className = 'modal-overlay';
+  div.innerHTML = `
+    <div class="modal-box modal-box-wide">
+      <div class="modal-header">
+        <h3 id="ageingModalTitle">Ageing Orders</h3>
+        <button class="modal-close" onclick="closeAgeingModal_()" aria-label="Close">&times;</button>
+      </div>
+      <div id="ageingModalBody" class="modal-body"><div class="loading">Loading…</div></div>
+    </div>`;
+  document.body.appendChild(div);
+  // Click on the dimmed backdrop (not the box itself) closes it.
+  div.addEventListener('click', (e) => { if (e.target === div) closeAgeingModal_(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAgeingModal_(); });
+}
+
+function closeAgeingModal_() {
+  const el = document.getElementById('ageingModalOverlay');
+  if (el) el.classList.remove('open');
+}
+
+async function openAgeingModal_(service) {
+  service = (service === 'QC') ? 'QC' : 'Non-QC Inhouse';
+  ensureAgeingModal_();
+  const overlay = document.getElementById('ageingModalOverlay');
+  const body = document.getElementById('ageingModalBody');
+  document.getElementById('ageingModalTitle').textContent = `Ageing Orders by City — ${service}`;
+  body.innerHTML = '<div class="loading">Loading…</div>';
+  overlay.classList.add('open');
+  try {
+    const data = await cachedFetchJSON(`${WEBAPP_URL}?action=ageingtable&service=${encodeURIComponent(service)}`, 5 * 60 * 1000);
+    body.innerHTML = ageingTableHTML_(data);
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state">Couldn't load the ageing table: ${err.message}</div>`;
+  }
+}
+
+function ageingTableHTML_(data) {
+  if (!data || data.error) return `<div class="empty-state">Couldn't load the ageing table${data && data.error ? ': ' + data.error : ''}.</div>`;
+  // A stray "QC" (or "Non-QC"/"Non QC") row can end up in this list — the
+  // Ageing tab's block-boundary detection reads the OTHER block's own label
+  // cell as if it were a city, when it sits inside this block's row range.
+  // Filtered here defensively; see the note left for the backend fix in
+  // readAgeing_ (the real, permanent fix belongs at the source).
+  const isStrayBlockLabel = name => /^(non[\s-]?)?qc$/i.test((name || '').toString().trim());
+  const rows = (data.rows || []).filter(r => !isStrayBlockLabel(r.city));
+  if (!rows.length) return '<div class="empty-state">No ageing data for this service yet.</div>';
+  const body = rows.map(r => `
+    <tr>
+      <td class="ageing-table-city">${r.city}</td>
+      <td>${r.total.toLocaleString()}</td>
+      <td>${r.d1.toLocaleString()}</td>
+      <td>${r.d2.toLocaleString()}</td>
+      <td>${r.d3.toLocaleString()}</td>
+      <td>${r.d4.toLocaleString()}</td>
+      <td>${r.d5.toLocaleString()}</td>
+      <td>${r.gt5.toLocaleString()}</td>
+    </tr>`).join('');
+  return `
+    <table class="ageing-table">
+      <thead><tr><th>City</th><th>Total</th><th>D-1</th><th>D-2</th><th>D-3</th><th>D-4</th><th>D-5</th><th>&gt;5 days</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
 }
 
 // ======================= STORE LIST (QC city page) =======================
@@ -805,29 +954,114 @@ function trendDirectionHTML(trend) {
   return `<span style="color:var(--red);font-size:12px;font-weight:700;">↓ Worsening</span>`;
 }
 
-function storeListHTML(storesPayload) {
-  if (!storesPayload || storesPayload.error || !storesPayload.stores.length) return '';
-  const cityParam = encodeURIComponent(storesPayload.city);
-  const rows = storesPayload.stores.map(s => `
-    <div class="store-row" onclick="window.location.href='store.html?store=${encodeURIComponent(s.storeCode)}&city=${cityParam}'">
+// Column definitions for the store list — key is the field on each store
+// object to sort by (null = not sortable, e.g. Trend has no single scalar to
+// compare). Label text lives here so header + sort logic can't drift apart.
+const STORE_LIST_COLUMNS = [
+  { key: 'storeCode',        label: 'Store',        sortable: true },
+  { key: null,               label: 'Trend',        sortable: false },
+  { key: 'totalOrders',      label: 'Total Orders', sortable: true },
+  { key: 'breachWithTolPct', label: 'Breach %',     sortable: true },
+  { key: 'ltPct',            label: 'Long Tail %',  sortable: true },
+  { key: 'dmSharePct',       label: 'DM Share',     sortable: true },
+  { key: 'tpSharePct',       label: '3P Share',     sortable: true },
+  { key: 'activeRiders',     label: 'Active Riders',sortable: true },
+  { key: 'p80LmTat',         label: 'TAT (mins)',   sortable: true }, // was mislabeled "(hrs)" — p80LmTat is minutes, same field the LM TAT chart already titles "(min)"
+];
+
+function storeRowCellsHTML_(s) {
+  return `
       <span class="store-code">${s.storeCode}</span>
-      <span>${trendDirectionHTML(s.trend)}</span>
-      <span>${s.totalOrders.toLocaleString()}</span>
-      <span>${(s.breachWithTolPct*100).toFixed(1)}%</span>
+      <span>${s.trend ? trendDirectionHTML(s.trend) : '—'}</span>
+      <span>${s.totalOrders != null ? Number(s.totalOrders).toLocaleString() : '—'}</span>
+      <span>${s.breachWithTolPct != null ? (s.breachWithTolPct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.ltPct != null ? (s.ltPct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.dmSharePct != null ? (s.dmSharePct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.tpSharePct != null ? (s.tpSharePct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.activeRiders != null ? Number(s.activeRiders).toLocaleString() : '—'}</span>
-      <span>${s.p80LmTat != null ? Number(s.p80LmTat).toFixed(1) : '—'}</span>
-    </div>`).join('');
+      <span>${s.p80LmTat != null ? Number(s.p80LmTat).toFixed(1) : '—'}</span>`;
+}
+
+// Order-weighted rollup of every store into one "Overall" row (the backend
+// payload doesn't hand back a ready-made total). Percentages are weighted by
+// each store's totalOrders so a small store's noisy % doesn't skew the city
+// figure; Active Riders and Total Orders are plain sums; TAT is a simple
+// average across stores that reported a value (P80 doesn't sum meaningfully).
+function computeStoreOverallRow_(stores) {
+  const totalOrders = stores.reduce((s, r) => s + (r.totalOrders || 0), 0);
+  const wavg = (field) => {
+    let num = 0, den = 0;
+    stores.forEach(r => { if (r[field] != null) { num += r[field] * (r.totalOrders || 0); den += (r.totalOrders || 0); } });
+    return den ? num / den : null;
+  };
+  const avg = (field) => {
+    const vals = stores.map(r => r[field]).filter(v => v != null);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  };
+  return {
+    storeCode: 'Overall', trend: null, totalOrders,
+    breachWithTolPct: wavg('breachWithTolPct'),
+    ltPct: wavg('ltPct'), dmSharePct: wavg('dmSharePct'), tpSharePct: wavg('tpSharePct'),
+    activeRiders: stores.reduce((s, r) => s + (r.activeRiders || 0), 0),
+    p80LmTat: avg('p80LmTat'),
+  };
+}
+
+let _storeListPayload = null;
+let _storeListSort = { key: null, dir: 1 }; // dir: 1 = ascending, -1 = descending
+
+// Re-sorts and redraws in place — bound to each sortable header's onclick.
+// Clicking the same column again flips direction; clicking a new column
+// starts it ascending. The Overall row and header never move.
+function sortStoreList_(key) {
+  if (!key) return;
+  if (_storeListSort.key === key) _storeListSort.dir *= -1;
+  else _storeListSort = { key, dir: 1 };
+  const holder = document.getElementById('storeListHolder');
+  if (holder) holder.innerHTML = renderStoreListInner_();
+}
+
+function renderStoreListInner_() {
+  const storesPayload = _storeListPayload;
+  if (!storesPayload || storesPayload.error || !storesPayload.stores.length) return '';
+  const cityParam = encodeURIComponent(storesPayload.city);
+  let stores = storesPayload.stores.slice();
+  if (_storeListSort.key) {
+    const key = _storeListSort.key, dir = _storeListSort.dir;
+    stores.sort((a, b) => {
+      let av = a[key], bv = b[key];
+      if (typeof av === 'string' || typeof bv === 'string') {
+        return dir * (av || '').toString().localeCompare((bv || '').toString());
+      }
+      av = av == null ? -Infinity : av;
+      bv = bv == null ? -Infinity : bv;
+      return dir * (av - bv);
+    });
+  }
+  const headerCells = STORE_LIST_COLUMNS.map(col => {
+    if (!col.sortable) return `<span>${col.label}</span>`;
+    const arrow = _storeListSort.key === col.key ? (_storeListSort.dir === 1 ? ' \u25B2' : ' \u25BC') : '';
+    return `<span class="store-sortable" onclick="sortStoreList_('${col.key}')">${col.label}${arrow}</span>`;
+  }).join('');
+  const overallRow = `<div class="store-row store-overall">${storeRowCellsHTML_(computeStoreOverallRow_(storesPayload.stores))}</div>`;
+  const rows = stores.map(s => `
+    <div class="store-row" onclick="window.location.href='store.html?store=${encodeURIComponent(s.storeCode)}&city=${cityParam}'">${storeRowCellsHTML_(s)}</div>`).join('');
   return `
     <div class="section-label">Stores in ${storesPayload.city} <span style="font-weight:500;text-transform:none;">(as of ${fmtDayLabel(storesPayload.asOf)})</span></div>
     <div class="store-list">
-      <div class="store-row store-header">
-        <span>Store</span><span>Trend</span><span>Total Orders</span><span>Breach %</span><span>Long Tail %</span><span>DM Share</span><span>3P Share</span><span>Active Riders</span><span>TAT (hrs)</span>
-      </div>
+      <div class="store-row store-header">${headerCells}</div>
+      ${overallRow}
       ${rows}
     </div>`;
+}
+
+// Entry point called by city.html/explore.html — stashes the payload (sort
+// clicks re-render from this without refetching) and resets any sort left
+// over from a previously viewed city.
+function storeListHTML(storesPayload) {
+  _storeListPayload = storesPayload;
+  _storeListSort = { key: null, dir: 1 };
+  return renderStoreListInner_();
 }
 
 // ======================= PAN INDIA CITY CARD =======================
@@ -1032,7 +1266,7 @@ async function prefetchAllCitiesAndStores(currentService, currentPeriod) {
 
     ['QC', 'Non-QC Inhouse'].forEach(svc => tasks.push(() => fetchCityData('Pan India', svc)));
 
-    (byService['QC'] || []).forEach(city => {
+    (byService['QC'] || []).filter(city => !isExcludedCity_(city)).forEach(city => {
       tasks.push(() => fetchCityData(city, 'QC'));
       tasks.push(async () => {
         const sd = await fetchStoresData(city);
@@ -1041,7 +1275,7 @@ async function prefetchAllCitiesAndStores(currentService, currentPeriod) {
         }
       });
     });
-    (byService['Non-QC Inhouse'] || []).forEach(city => {
+    (byService['Non-QC Inhouse'] || []).filter(city => !isExcludedCity_(city)).forEach(city => {
       tasks.push(() => fetchCityData(city, 'Non-QC Inhouse'));
     });
 
