@@ -174,7 +174,10 @@ select.control-select {
 
 .city-card.red { border-left-color: var(--red); }
 .city-card.amber { border-left-color: var(--amber); }
-.city-card.green { border-left-color: var(--green); }
+/* "As per trend" scorecards — green rail since nothing here is breaching,
+   same card shell as the breach cards above so the two sections read as one
+   consistent grid rather than two different UI patterns. */
+.city-card.good { border-left-color: var(--green); background: linear-gradient(135deg, #fff 0%, #F3FBF6 100%); }
 
 .city-card .city-name {
   font-size: 17px;
@@ -234,7 +237,6 @@ select.control-select {
 
 .pill.red { background: var(--red-bg); color: var(--red); }
 .pill.amber { background: var(--amber-bg); color: var(--amber); }
-.pill.green { background: var(--green-bg); color: var(--green); }
 
 .trend-arrow { font-size: 12px; }
 .trend-arrow.worsening { color: var(--red); }
@@ -313,7 +315,10 @@ select.control-select {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 16px;
-  font-size: 14px;
+  /* Bumped up from 14px per request — these are the city-tab section
+     headings (3P Acceptance, DM Rider Efficiency, etc.) and were reading too
+     small next to the chart-card h3s around them. */
+  font-size: 18px;
   font-weight: 800;
   color: var(--header-blue);
   text-align: center;
@@ -724,8 +729,31 @@ select.control-select {
   text-transform: uppercase;
   letter-spacing: 0.4px;
   background: #F8FAFC;
+  /* Stays put while the store list scrolls past it. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 .store-row.store-header:hover { background: #F8FAFC; }
+
+/* Clickable column heading — click toggles that column asc/desc. */
+.store-sortable { cursor: pointer; user-select: none; }
+.store-sortable:hover { color: var(--header-blue-2); }
+
+/* Overall roll-up row — pinned directly under the header (also sticky) so it
+   never moves when the rows below it get re-sorted. */
+.store-row.store-overall {
+  cursor: default;
+  font-weight: 700;
+  background: #FBF3F5;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 34px; /* approx. header row height, so it sits directly under it */
+  z-index: 1;
+}
+.store-row.store-overall:hover { background: #FBF3F5; }
+.store-row.store-overall .store-code { color: var(--header-blue); }
 
 .store-code { font-weight: 700; color: var(--header-blue-2); }
 
@@ -745,6 +773,16 @@ select.control-select {
   background: linear-gradient(135deg, #fff 0%, #F4F8FC 100%);
 }
 
+/* Top-of-home row: Cold Chain scorecard + Pan India card side by side. The
+   Pan India card normally lives in a CSS-grid cell (sized by the grid); here
+   it's a flex sibling of the cold-chain scorecard, so it needs its own width
+   bounds to avoid stretching edge-to-edge. */
+.top-summary-row .city-card.pan-india-card {
+  min-width: 260px;
+  max-width: 380px;
+  margin: 0;
+}
+
 .pan-india-chip {
   font-size: 10px;
   font-weight: 700;
@@ -757,3 +795,94 @@ select.control-select {
   margin-left: 8px;
   vertical-align: middle;
 }
+
+/* ======================= CLICKABLE SUMMARY CARDS ======================= */
+/* Cold Chain Breach card -> opens the Cold Chain ops sheet; Ageing card ->
+   opens the full ageing-by-city modal. Same hover treatment for both so the
+   affordance is consistent wherever a card is clickable. */
+.clickable-card {
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.clickable-card:hover {
+  box-shadow: 0 4px 14px rgba(22, 50, 79, 0.14);
+  transform: translateY(-1px);
+}
+
+/* ======================= MODAL (Ageing table) ======================= */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(22, 35, 46, 0.55);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.modal-overlay.open { display: flex; }
+
+.modal-box {
+  background: var(--card-bg);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(22, 50, 79, 0.28);
+  max-height: 85vh;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-box-wide { max-width: 860px; }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 22px;
+  background: linear-gradient(135deg, var(--header-blue) 0%, var(--header-blue-2) 100%);
+  color: #fff;
+  flex-shrink: 0;
+}
+.modal-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.modal-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.modal-close:hover { background: rgba(255,255,255,0.15); }
+
+.modal-body {
+  padding: 18px 22px 22px;
+  overflow: auto;
+}
+
+.ageing-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ageing-table th, .ageing-table td {
+  padding: 8px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.ageing-table th:first-child, .ageing-table td:first-child { text-align: left; }
+.ageing-table th {
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  background: #F8FAFC;
+  position: sticky;
+  top: 0;
+}
+.ageing-table-city { font-weight: 700; color: var(--header-blue-2); }
+.ageing-table tr:hover td { background: #F5F9FD; }
