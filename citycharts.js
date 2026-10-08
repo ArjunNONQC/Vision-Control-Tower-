@@ -1045,7 +1045,7 @@ function renderStoreListInner_() {
   }).join('');
   const overallRow = `<div class="store-row store-overall">${storeRowCellsHTML_(computeStoreOverallRow_(storesPayload.stores))}</div>`;
   const rows = stores.map(s => `
-    <div class="store-row" onclick="window.location.href='store.html?store=${encodeURIComponent(s.storeCode)}&city=${cityParam}'">${storeRowCellsHTML_(s)}</div>`).join('');
+    <div class="store-row" onclick="window.location.href='store.html?store=${encodeURIComponent(s.storeCode)}&city=${cityParam}&period='+(typeof period!=='undefined'?period:'DoD')">${storeRowCellsHTML_(s)}</div>`).join('');
   return `
     <div class="section-label">Stores in ${storesPayload.city} <span style="font-weight:500;text-transform:none;">(as of ${fmtDayLabel(storesPayload.asOf)})</span></div>
     <div class="store-list">
