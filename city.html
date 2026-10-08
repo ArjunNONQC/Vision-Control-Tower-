@@ -42,23 +42,27 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=41"></script>
+<script src="citycharts.js?v=42"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const CITY = params.get('city');
 let service = params.get('service') || 'Non-QC Inhouse';
-let period = 'DoD';
+let period = params.get('period') === 'WoW' ? 'WoW' : 'DoD';
 let cityMeta = {}, rawSeries = null, cityData = null;
 
 document.getElementById('cityTitle').textContent = CITY;
 [...document.getElementById('serviceToggle').children].forEach(b => {
   b.classList.toggle('active', b.dataset.val === service);
 });
+[...document.getElementById('periodToggle').children].forEach(b => {
+  b.classList.toggle('active', b.dataset.val === period);
+});
 
 // So "← Vision Home" from a QC city lands on the QC home view (and Non-QC on
 // Non-QC), instead of always resetting to Non-QC.
 function updateHomeLink_() {
-  document.getElementById('homeLink').href = `index.html?service=${encodeURIComponent(service)}`;
+  document.getElementById('homeLink').href = `index.html?service=${encodeURIComponent(service)}&period=${period}`;
+  try { history.replaceState(null, '', `?city=${encodeURIComponent(CITY)}&service=${encodeURIComponent(service)}&period=${period}`); } catch (e) {}
 }
 updateHomeLink_();
 
@@ -75,6 +79,7 @@ document.getElementById('periodToggle').addEventListener('click', (e) => {
   [...e.currentTarget.children].forEach(b => b.classList.remove('active'));
   e.target.classList.add('active');
   period = e.target.dataset.val;
+  updateHomeLink_();
   renderScorecards(); // the cold chain card has a WoW version too
   renderForService();
 });
