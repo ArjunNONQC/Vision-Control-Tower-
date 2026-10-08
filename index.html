@@ -63,7 +63,7 @@
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=41"></script>
+<script src="citycharts.js?v=42"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -107,22 +107,36 @@ function initLock() {
 // Deep-linked from a city/store/explore page via ?service=... so coming back
 // to "Vision Home" from a QC city lands on the QC home view (and Non-QC on
 // Non-QC), instead of always resetting to Non-QC.
-const requestedService = new URLSearchParams(window.location.search).get('service');
-const state = { service: requestedService === 'QC' ? 'QC' : 'Non-QC Inhouse', period: 'DoD' };
+const qs_ = new URLSearchParams(window.location.search);
+const requestedService = qs_.get('service');
+const state = { service: requestedService === 'QC' ? 'QC' : 'Non-QC Inhouse', period: qs_.get('period') === 'WoW' ? 'WoW' : 'DoD' };
 [...document.getElementById('serviceToggle').children].forEach(b => {
   b.classList.toggle('active', b.dataset.val === state.service);
 });
+[...document.getElementById('periodToggle').children].forEach(b => {
+  b.classList.toggle('active', b.dataset.val === state.period);
+});
+// Keep DoD/WoW + service in the URL and in the "All Cities" link.
+function syncNav_() {
+  const q = `service=${encodeURIComponent(state.service)}&period=${state.period}`;
+  const a = document.querySelector('a[href^="explore.html"]');
+  if (a) a.href = `explore.html?${q}`;
+  try { history.replaceState(null, '', `?${q}`); } catch (e) {}
+}
+syncNav_();
 
 document.getElementById('serviceToggle').addEventListener('click', (e) => {
   if (e.target.tagName !== 'BUTTON') return;
   setActive(e.currentTarget, e.target);
   state.service = e.target.dataset.val;
+  syncNav_();
   load();
 });
 document.getElementById('periodToggle').addEventListener('click', (e) => {
   if (e.target.tagName !== 'BUTTON') return;
   setActive(e.currentTarget, e.target);
   state.period = e.target.dataset.val;
+  syncNav_();
   load();
 });
 function setActive(group, btn) {
@@ -159,7 +173,7 @@ function renderBreachCard(c) {
 }
 
 function goToCity(city, service) {
-  window.location.href = `city.html?city=${encodeURIComponent(city)}&service=${encodeURIComponent(service)}`;
+  window.location.href = `city.html?city=${encodeURIComponent(city)}&service=${encodeURIComponent(service)}&period=${encodeURIComponent(state.period)}`;
 }
 
 // "As per trend" mini scorecard — green-themed (nothing here is breaching),
