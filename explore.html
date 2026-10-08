@@ -45,14 +45,17 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=41"></script>
+<script src="citycharts.js?v=42"></script>
 <script>
-let period = 'DoD';
-let service = 'Non-QC Inhouse';
+const qp_ = new URLSearchParams(window.location.search);
+let period = qp_.get('period') === 'WoW' ? 'WoW' : 'DoD';
+let service = qp_.get('service') === 'QC' ? 'QC' : 'Non-QC Inhouse';
 let cityMeta = {}, rawSeries = null, cityData = null;
 let citiesByService = {};
 
 const serviceSelect = document.getElementById('serviceSelect');
+serviceSelect.value = service;
+[...document.getElementById('periodToggle').children].forEach(b => b.classList.toggle('active', b.dataset.val === period));
 const citySelect = document.getElementById('citySelect');
 
 document.getElementById('periodToggle').addEventListener('click', (e) => {
@@ -60,12 +63,13 @@ document.getElementById('periodToggle').addEventListener('click', (e) => {
   [...e.currentTarget.children].forEach(b => b.classList.remove('active'));
   e.target.classList.add('active');
   period = e.target.dataset.val;
+  updateHomeLink_();
   renderScorecards(); // the cold chain card has a WoW version too
   if (rawSeries) renderForService();
 });
 
 function updateHomeLink_() {
-  document.getElementById('homeLink').href = `index.html?service=${encodeURIComponent(service)}`;
+  document.getElementById('homeLink').href = `index.html?service=${encodeURIComponent(service)}&period=${period}`;
 }
 
 serviceSelect.addEventListener('change', () => {
