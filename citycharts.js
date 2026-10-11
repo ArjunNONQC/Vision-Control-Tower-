@@ -966,6 +966,7 @@ const STORE_LIST_COLUMNS = [
   { key: 'dmSharePct',       label: 'DM Share',     sortable: true },
   { key: 'tpSharePct',       label: '3P Share',     sortable: true },
   { key: 'activeRiders',     label: 'Active Riders',sortable: true },
+  { key: 'pullbackPct',      label: 'Pullback %',   sortable: true },
   { key: 'p80LmTat',         label: 'TAT (mins)',   sortable: true }, // was mislabeled "(hrs)" — p80LmTat is minutes, same field the LM TAT chart already titles "(min)"
 ];
 
@@ -979,6 +980,7 @@ function storeRowCellsHTML_(s) {
       <span>${s.dmSharePct != null ? (s.dmSharePct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.tpSharePct != null ? (s.tpSharePct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.activeRiders != null ? Number(s.activeRiders).toLocaleString() : '—'}</span>
+      <span>${s.pullbackPct != null ? (s.pullbackPct*100).toFixed(1) + '%' : '—'}</span>
       <span>${s.p80LmTat != null ? Number(s.p80LmTat).toFixed(1) : '—'}</span>`;
 }
 
@@ -1003,6 +1005,7 @@ function computeStoreOverallRow_(stores) {
     breachWithTolPct: wavg('breachWithTolPct'),
     ltPct: wavg('ltPct'), dmSharePct: wavg('dmSharePct'), tpSharePct: wavg('tpSharePct'),
     activeRiders: stores.reduce((s, r) => s + (r.activeRiders || 0), 0),
+    pullbackPct: wavg('pullbackPct'),
     p80LmTat: avg('p80LmTat'),
   };
 }
@@ -1022,8 +1025,15 @@ function sortStoreList_(key) {
 }
 
 function renderStoreListInner_() {
-  const storesPayload = _storeListPayload;
-  if (!storesPayload || storesPayload.error || !storesPayload.stores.length) return '';
+  const basePayload = _storeListPayload;
+  if (!basePayload || basePayload.error || !basePayload.stores.length) return '';
+  // WoW toggle -> the weekly table (latest completed week from the WoW sheet).
+  // A payload cached before the weekly block existed falls back to daily and says so.
+  const wantWeekly = typeof period !== 'undefined' && period === 'WoW';
+  const w = wantWeekly && basePayload.weekly && basePayload.weekly.stores && basePayload.weekly.stores.length ? basePayload.weekly : null;
+  const storesPayload = w ? { city: basePayload.city, stores: w.stores } : basePayload;
+  const asOfText = w ? `week of ${fmtDayLabel(w.asOf)} \u2013 ${fmtDayLabel(w.weekEnd)}`
+    : `as of ${fmtDayLabel(basePayload.asOf)}${wantWeekly ? ' \u2013 weekly view unavailable' : ''}`;
   const cityParam = encodeURIComponent(storesPayload.city);
   let stores = storesPayload.stores.slice();
   if (_storeListSort.key) {
@@ -1047,12 +1057,18 @@ function renderStoreListInner_() {
   const rows = stores.map(s => `
     <div class="store-row" onclick="window.location.href='store.html?store=${encodeURIComponent(s.storeCode)}&city=${cityParam}&period='+(typeof period!=='undefined'?period:'DoD')">${storeRowCellsHTML_(s)}</div>`).join('');
   return `
-    <div class="section-label">Stores in ${storesPayload.city} <span style="font-weight:500;text-transform:none;">(as of ${fmtDayLabel(storesPayload.asOf)})</span></div>
+    <div class="section-label">Stores in ${storesPayload.city} <span style="font-weight:500;text-transform:none;">(${asOfText})</span></div>
     <div class="store-list">
       <div class="store-row store-header">${headerCells}</div>
       ${overallRow}
       ${rows}
     </div>`;
+}
+
+// Redraws the table for the current DoD/WoW period without refetching.
+function refreshStoreList_() {
+  const holder = document.getElementById('storeListHolder');
+  if (holder && _storeListPayload && holder.innerHTML) holder.innerHTML = renderStoreListInner_();
 }
 
 // Entry point called by city.html/explore.html — stashes the payload (sort
