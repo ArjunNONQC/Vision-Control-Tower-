@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — City Detail</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=23" />
+<link rel="stylesheet" href="style.css?v=24" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -42,7 +42,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=42"></script>
+<script src="citycharts.js?v=43"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const CITY = params.get('city');
@@ -81,6 +81,7 @@ document.getElementById('periodToggle').addEventListener('click', (e) => {
   period = e.target.dataset.val;
   updateHomeLink_();
   renderScorecards(); // the cold chain card has a WoW version too
+  if (service === 'QC') refreshStoreList_(); // store table has a weekly version too
   renderForService();
 });
 
