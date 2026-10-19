@@ -28,12 +28,19 @@ function fmtDayLabel(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
+// True while the week starting on this Monday has not ended yet (week to date).
+function isWeekInProgress_(mondayStr) {
+  const sun = new Date(mondayStr + 'T00:00:00'); sun.setDate(sun.getDate() + 6);
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  return sun >= now;
+}
 function fmtWeekLabel(mondayStr) {
   const mon = new Date(mondayStr + 'T00:00:00');
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const wtd = isWeekInProgress_(mondayStr) ? ' (WTD)' : '';
   const sameMonth = mon.getMonth() === sun.getMonth();
-  return sameMonth ? `${mon.getDate()}-${sun.getDate()} ${MONTHS[mon.getMonth()]}`
-                    : `${mon.getDate()} ${MONTHS[mon.getMonth()]} - ${sun.getDate()} ${MONTHS[sun.getMonth()]}`;
+  return (sameMonth ? `${mon.getDate()}-${sun.getDate()} ${MONTHS[mon.getMonth()]}`
+                    : `${mon.getDate()} ${MONTHS[mon.getMonth()]} - ${sun.getDate()} ${MONTHS[sun.getMonth()]}`) + wtd;
 }
 function round1_(n) { return Math.round(n * 10) / 10; }
 
@@ -1032,7 +1039,7 @@ function renderStoreListInner_() {
   const wantWeekly = typeof period !== 'undefined' && period === 'WoW';
   const w = wantWeekly && basePayload.weekly && basePayload.weekly.stores && basePayload.weekly.stores.length ? basePayload.weekly : null;
   const storesPayload = w ? { city: basePayload.city, stores: w.stores } : basePayload;
-  const asOfText = w ? `week of ${fmtDayLabel(w.asOf)} \u2013 ${fmtDayLabel(w.weekEnd)}`
+  const asOfText = w ? `week of ${fmtDayLabel(w.asOf)} \u2013 ${fmtDayLabel(w.weekEnd)}${isWeekInProgress_(w.asOf) ? ', week to date' : ''}`
     : `as of ${fmtDayLabel(basePayload.asOf)}${wantWeekly ? ' \u2013 weekly view unavailable' : ''}`;
   const cityParam = encodeURIComponent(storesPayload.city);
   let stores = storesPayload.stores.slice();
