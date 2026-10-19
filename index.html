@@ -63,7 +63,7 @@
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=43"></script>
+<script src="citycharts.js?v=44"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -270,6 +270,11 @@ function renderHomeData(data) {
   try {
     const diagBanner = document.getElementById('diagBanner');
     diagBanner.innerHTML = schemaWarningHTML(data.schemaWarnings);
+    // WoW compares the latest week in the sheet with the one before it; say so when
+    // the latest is still in progress (week to date).
+    if (data.period === 'WoW' && data.asOf && isWeekInProgress_(data.asOf)) {
+      diagBanner.innerHTML = `<div style="margin:0 0 10px;padding:8px 12px;background:#EEF4FB;border:1px solid #D5E3F3;border-radius:8px;font-size:13px;">WoW shows the current week so far (<b>${fmtWeekLabel(data.asOf)}</b>) against the last full week. Numbers firm up as the week completes.</div>` + diagBanner.innerHTML;
+    }
     if (data.diagnostic) {
       // asOf came back null — no rows matched this service at all
       diagBanner.innerHTML += `<div class="empty-state" style="background:#FDECEA;border:1px solid #F5C6C0;border-radius:8px;padding:12px 16px;margin-bottom:16px;color:#8B2E22;">
