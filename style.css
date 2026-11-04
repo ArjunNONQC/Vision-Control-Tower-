@@ -886,3 +886,10 @@ select.control-select {
 }
 .ageing-table-city { font-weight: 700; color: var(--header-blue-2); }
 .ageing-table tr:hover td { background: #F5F9FD; }
+
+/* Sub-line under a grouped city's name (e.g. Tricity). */
+.city-card .city-sub { font-size: 12px; font-weight: 600; color: var(--text-muted); margin: -3px 0 6px; }
+.ageing-table-city .city-sub { font-size: 11px; font-weight: 500; color: var(--text-muted); }
+.topbar h1 .city-sub-h { display: block; font-size: 13px; font-weight: 500; opacity: 0.85; }
+.city-sub-line { font-size: 13px; font-weight: 600; color: var(--text-muted); margin: 0 0 10px; }
+.city-sub-line:empty { display: none; }
