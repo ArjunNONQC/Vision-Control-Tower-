@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — City Tracker</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=24" />
+<link rel="stylesheet" href="style.css?v=25" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -63,7 +63,7 @@
 </div><!-- /appRoot -->
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=44"></script>
+<script src="citycharts.js?v=45"></script>
 <script>
 const LOCK_KEY = 'vision_unlocked';
 
@@ -166,7 +166,7 @@ function renderBreachCard(c) {
 
   return `
     <div class="city-card ${sevClass}" onclick="goToCity('${c.city}','${c.service}')">
-      <div class="city-name">${cityIconHTML_(c.city)}${c.city}</div>
+      <div class="city-name">${cityIconHTML_(c.city)}${c.city}</div>${citySubHTML_(c.city)}
       <div class="driven-by">Driven by: ${metricLabel(c.drivenBy)}${c.orders != null ? ` <span class="card-orders">· ${c.orders.toLocaleString()} orders</span>` : ''}</div>
       ${rows}
     </div>`;
@@ -192,7 +192,7 @@ function renderTrendCard(c) {
       </div>`).join('');
   return `
     <div class="city-card good" onclick="goToCity('${c.city}','${c.service}')">
-      <div class="city-name">${cityIconHTML_(c.city)}${c.city}</div>
+      <div class="city-name">${cityIconHTML_(c.city)}${c.city}</div>${citySubHTML_(c.city)}
       <div class="driven-by">${c.orders != null ? `<span class="card-orders">${c.orders.toLocaleString()} orders</span>` : ''}</div>
       ${rows}
     </div>`;
