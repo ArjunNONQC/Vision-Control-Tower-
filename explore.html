@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — Explore All Cities</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=24" />
+<link rel="stylesheet" href="style.css?v=25" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -38,6 +38,7 @@
 </div>
 
 <div class="container">
+  <div id="citySub" class="city-sub-line"></div>
   <div id="diagBanner"></div>
   <div id="scorecardHolder"></div>
   <div id="chartGrid" class="chart-grid"><div class="loading">Pick a city above to see its metrics.</div></div>
@@ -45,7 +46,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=44"></script>
+<script src="citycharts.js?v=45"></script>
 <script>
 const qp_ = new URLSearchParams(window.location.search);
 let period = qp_.get('period') === 'WoW' ? 'WoW' : 'DoD';
@@ -85,7 +86,7 @@ updateHomeLink_();
 function populateCityDropdown(svc) {
   const cities = (citiesByService[svc] || []).filter(c => !isExcludedCity_(c));
   citySelect.innerHTML = cities.length
-    ? cities.map(c => `<option value="${c}">${c}</option>`).join('')
+    ? cities.map(c => `<option value="${c}">${c}${citySubtitle_(c) ? ' ' + citySubtitle_(c) : ''}</option>`).join('')
     : '<option>No cities found</option>';
 }
 
@@ -97,6 +98,11 @@ function renderScorecards() {
     statPanelsHTML(cityData.orderSummary, cold, cityData.ageing, cityData.ageing ? 'D-1, latest' : null, service);
 }
 
+function showCitySub_(city) {
+  const s = citySubtitle_(city);
+  document.getElementById('citySub').textContent = s ? `${city} ${s}` : '';
+}
+
 function renderForService() {
   if (service === 'QC') renderQcCharts(cityMeta, rawSeries, period);
   else renderNonQcCharts(cityMeta, rawSeries, period);
@@ -104,6 +110,7 @@ function renderForService() {
 
 async function loadSelectedCity(force) {
   const city = citySelect.value;
+  showCitySub_(city);
   if (!city || city === 'No cities found') {
     document.getElementById('chartGrid').innerHTML = '<div class="empty-state">No data available for this service yet.</div>';
     document.getElementById('scorecardHolder').innerHTML = '';
