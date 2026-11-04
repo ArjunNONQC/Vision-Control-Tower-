@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — Store Detail</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=24" />
+<link rel="stylesheet" href="style.css?v=25" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -36,7 +36,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=44"></script>
+<script src="citycharts.js?v=45"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const STORE_CODE = params.get('store');
@@ -87,6 +87,7 @@ function renderStoreData(data) {
   weeklySeries = data.weeklySeries;
   acceptancePartners = data.acceptancePartners || [];
   document.getElementById('storeTitle').textContent = `${data.storeCode} — ${data.city} (QC)`;
+  if (citySubtitle_(data.city)) { const s = document.createElement('small'); s.className = 'city-sub-h'; s.textContent = citySubtitle_(data.city); document.getElementById('storeTitle').appendChild(s); }
   document.getElementById('backToCity').innerHTML =
     `<a class="nav-btn" href="city.html?city=${encodeURIComponent(data.city)}&service=QC&period=${period}" style="margin-right:8px;">← Back to ${data.city}</a>`;
   storeCity_ = data.city; updateLinks_();
