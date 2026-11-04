@@ -24,6 +24,17 @@ if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+// Cities that are really a group of towns get a small line under their name
+// wherever the name is shown (cards, page title, store list, ageing table).
+const CITY_SUBTITLES_ = { tricity: '(Panchkula, Chandigarh, Mohali)' };
+function citySubtitle_(city) {
+  return CITY_SUBTITLES_[(city || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '')] || '';
+}
+function citySubHTML_(city) {
+  const s = citySubtitle_(city);
+  return s ? `<div class="city-sub">${s}</div>` : '';
+}
+
 function fmtDayLabel(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
@@ -924,7 +935,7 @@ function ageingTableHTML_(data) {
   if (!rows.length) return '<div class="empty-state">No ageing data for this service yet.</div>';
   const body = rows.map(r => `
     <tr>
-      <td class="ageing-table-city">${r.city}</td>
+      <td class="ageing-table-city">${r.city}${citySubHTML_(r.city)}</td>
       <td>${r.total.toLocaleString()}</td>
       <td>${r.d1.toLocaleString()}</td>
       <td>${r.d2.toLocaleString()}</td>
@@ -1064,7 +1075,7 @@ function renderStoreListInner_() {
   const rows = stores.map(s => `
     <div class="store-row" onclick="window.location.href='store.html?store=${encodeURIComponent(s.storeCode)}&city=${cityParam}&period='+(typeof period!=='undefined'?period:'DoD')">${storeRowCellsHTML_(s)}</div>`).join('');
   return `
-    <div class="section-label">Stores in ${storesPayload.city} <span style="font-weight:500;text-transform:none;">(${asOfText})</span></div>
+    <div class="section-label">Stores in ${storesPayload.city}${citySubtitle_(storesPayload.city) ? ' <span style="font-weight:500;text-transform:none;">' + citySubtitle_(storesPayload.city) + '</span>' : ''} <span style="font-weight:500;text-transform:none;">(${asOfText})</span></div>
     <div class="store-list">
       <div class="store-row store-header">${headerCells}</div>
       ${overallRow}
