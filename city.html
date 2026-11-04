@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <title>Vision — City Detail</title>
 <link rel="icon" type="image/svg+xml" href="vision-icon.svg" />
-<link rel="stylesheet" href="style.css?v=24" />
+<link rel="stylesheet" href="style.css?v=25" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -42,7 +42,7 @@
 </div>
 
 <script src="config.js?v=2"></script>
-<script src="citycharts.js?v=44"></script>
+<script src="citycharts.js?v=45"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const CITY = params.get('city');
@@ -51,6 +51,13 @@ let period = params.get('period') === 'WoW' ? 'WoW' : 'DoD';
 let cityMeta = {}, rawSeries = null, cityData = null;
 
 document.getElementById('cityTitle').textContent = CITY;
+function setCityTitle_(text) {
+  const el = document.getElementById('cityTitle');
+  el.textContent = text;
+  const sub = citySubtitle_(CITY);
+  if (sub) { const s = document.createElement('small'); s.className = 'city-sub-h'; s.textContent = sub; el.appendChild(s); }
+}
+setCityTitle_(CITY);
 [...document.getElementById('serviceToggle').children].forEach(b => {
   b.classList.toggle('active', b.dataset.val === service);
 });
@@ -130,7 +137,7 @@ async function renderCityData(data) {
   // weekly rows from cityMeta, and fall back to re-bucketing daily numbers without it.
   cityMeta = { overallBreachBaseline: data.overallBreachBaseline, ltBaseline: data.ltBaseline, sddFasterBaseline: data.sddFasterBaseline, acceptancePartners: data.acceptancePartners || [], weeklySeries: data.weeklySeries };
   rawSeries = data.series;
-  document.getElementById('cityTitle').textContent = `${CITY} — ${service}`;
+  setCityTitle_(`${CITY} — ${service}`);
   document.getElementById('diagBanner').innerHTML = schemaWarningHTML(data.schemaWarnings);
 
   renderScorecards();
